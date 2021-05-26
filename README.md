@@ -1,1 +1,1 @@
-# image-animation
+# Image Animation
