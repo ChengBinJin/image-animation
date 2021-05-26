@@ -1,13 +1,13 @@
 import yaml
-import matplotlib
-import imageio
-import torch
-import numpy as np
+# import matplotlib
+# import imageio
+# import torch
+# import numpy as np
 from argparse import ArgumentParser
 
 # from transfer import transfer_one
 # from logger import Logger
-# from modules.generator import MotionTransferGenerator
+from library.modules.generator import MotionTransferGenerator
 # from modules.keypoint_detector import KPDetector
 # from sync_batchnorm import DataParallelWithCallback
 # from frames_dataset import read_video
@@ -28,6 +28,9 @@ if __name__ == "__main__":
         config = yaml.load(f, Loader=yaml.FullLoader)
         blocks_discrimiantor = config['model_params']['discriminator_params']['num_blocks']
         assert len(config['train_params']['loss_weights']['reconstruction']) == blocks_discrimiantor + 1
+
+    generator = MotionTransferGenerator(**config['model_params']['common_params'],
+                                        **config['model_params']['generator_params'])
 
     print(f"Hello world!")
 
