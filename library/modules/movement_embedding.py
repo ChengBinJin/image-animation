@@ -1,5 +1,8 @@
 # import torch
+import torch.nn.functional as F
 from torch import nn
+
+from library.modules.keypoint_detector import kp2gaussian
 
 
 class MovementEmbeddingModule(nn.Module):
@@ -26,3 +29,16 @@ class MovementEmbeddingModule(nn.Module):
         self.norm_const = norm_const
         self.scale_factor = scale_factor
 
+    def forward(self, source_image, kp_driving, kp_source):
+        if self.scale_factor != 1:
+            source_image = F.interpolate(source_image, scale_factor=(1, self.sacle_factor, self.scale_factor))
+
+        spatial_size = source_image.shape[3:]
+
+        bs, _, _, h, w = source_image.shape
+        _, d, num_kp, _ = kp_driving['mean'].shape
+
+        # inputs = []
+        # if self.use_heatmap:
+        #     heatmap = self.normalize_heatmap(
+        #         kp2guassian(kp_driving, spatial_size=spatial_size, kp_variance=self.kp_variance))

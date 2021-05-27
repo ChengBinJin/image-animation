@@ -1,9 +1,15 @@
+import sys
+import os
 import yaml
 # import matplotlib
 # import imageio
 # import torch
 # import numpy as np
 from argparse import ArgumentParser
+
+source_file_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
+project_dir = os.path.split(source_file_dir)[0]
+sys.path.append(project_dir)
 
 # from transfer import transfer_one
 # from logger import Logger
