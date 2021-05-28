@@ -14,7 +14,7 @@ sys.path.append(project_dir)
 # from transfer import transfer_one
 # from logger import Logger
 from library.modules.generator import MotionTransferGenerator
-# from modules.keypoint_detector import KPDetector
+from library.modules.keypoint_detector import KPDetector
 # from sync_batchnorm import DataParallelWithCallback
 # from frames_dataset import read_video
 # from augmentation import VideoToTensor
@@ -35,8 +35,11 @@ if __name__ == "__main__":
         blocks_discrimiantor = config['model_params']['discriminator_params']['num_blocks']
         assert len(config['train_params']['loss_weights']['reconstruction']) == blocks_discrimiantor + 1
 
-    generator = MotionTransferGenerator(**config['model_params']['common_params'],
-                                        **config['model_params']['generator_params'])
+    kp_detector = KPDetector(**config['model_params']['common_params'],
+                             **config['model_params']['kp_detector_params'])
+
+    # generator = MotionTransferGenerator(**config['model_params']['common_params'],
+    #                                     **config['model_params']['generator_params'])
 
     print(f"Hello world!")
 

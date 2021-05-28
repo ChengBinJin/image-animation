@@ -1,7 +1,20 @@
 import torch
+from torch import nn
 
-from library.modules.util import make_coordinate_grid, matrix_inverse
+from library.modules.util import Hourglass, make_coordinate_grid, matrix_inverse
 
+
+class KPDetector(nn.Module):
+    """
+    Detecting a keypoint. Return keypoint position and variance.
+    """
+
+    def __init__(self, block_expansion, num_kp, num_channels, max_features, num_blocks, temperature,
+                 kp_variance, scale_factor=1, clip_variance=None):
+        super(KPDetector, self).__init__()
+
+        self.predictor = Hourglass(block_expansion, in_features=num_channels, out_features=num_kp,
+                                   max_features=max_features, num_blocks=num_blocks)
 
 def kp2gaussian(kp, spatial_size, kp_variance='matrix'):
     """
