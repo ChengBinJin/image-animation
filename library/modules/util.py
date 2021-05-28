@@ -65,6 +65,27 @@ def make_coordinate_grid(spatial_size, dtype):
     yy = y.view(-1, 1).repeat(1, w)
     xx = x.view(1, -1).repeat(h, 1)
 
-    meshed = torch.cat([xx.unsqueeze_(dim=2), yy.unsqueeze_(2)], dim=2)
+    meshed = torch.cat([xx.unsqueeze_(dim=2), yy.unsqueeze_(2)], dim=2)  # H, W, 2
 
     return meshed
+
+
+def matrix_inverse(batch_of_matrix, eps=0):
+    if eps != 0:
+        init_shape = batch_of_matrix.shape
+        a = batch_of_matrix[..., 0, 0].unsqueeze(-1)
+        b = batch_of_matrix[..., 0, 1].unsqueeze(-1)
+        c = batch_of_matrix[..., 1, 0].unsqueeze(-1)
+        d = batch_of_matrix[..., 1, 1].unsqueeze(-1)
+
+        det = a * d - b * c
+        out = torch.cat([d, -b, -c, a], dim=-1)
+        eps = torch.tensor(eps).type(out.type())
+        out /= det.max(eps)
+
+        return out.view(init_shape)
+    else:
+        b_mat = batch_of_matrix
+        eye = b_mat.new_ones(b_mat.size(-1)).diag().expand_as(b_mat)
+        b_inv, _ = torch.solve(eye, b_mat)
+        return b_inv
