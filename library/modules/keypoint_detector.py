@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from torch import nn
 
 from library.modules.util import Hourglass, make_coordinate_grid, matrix_inverse
@@ -15,6 +16,24 @@ class KPDetector(nn.Module):
 
         self.predictor = Hourglass(block_expansion, in_features=num_channels, out_features=num_kp,
                                    max_features=max_features, num_blocks=num_blocks)
+        self.temperature = temperature
+        self.kp_variance = kp_variance
+        self.scale_factor = scale_factor
+        self.clip_variance = clip_variance
+
+    def forward(self, x):  # x shape: (N, t, 3, H, W)
+        if self.scale_factor != 1:
+            x = F.interpolate(x, scale_factor=(1, self.scale_factor, self.scale_factor))
+
+        heatmap = self.predictor(x)     # [N, kp, 3, H/2, W/2]
+        final_shape = heatmap.shape     # [N, kp, 3, H/2, W/2]
+        heatmap = heatmap.view(final_shape[0], final_shape[1], final_shape[2], -1)  # [N, kp, 3, H/2*W/2]
+        heatmap = F.softmax(heatmap / self.temperature, dim=3)                      # [N, kp, 3, H/2*W/2]
+        heatmap = heatmap.view(*final_shape)                                        # [N, kp, 3, H/2, W/2]
+        out = gaussian2kp(heatmap, self.kp_variance, self.clip_variance)
+
+        return out
+
 
 def kp2gaussian(kp, spatial_size, kp_variance='matrix'):
     """
@@ -49,3 +68,7 @@ def kp2gaussian(kp, spatial_size, kp_variance='matrix'):
         out = torch.exp(-0.5 * (mean_sub ** 2).sum(-1) / kp_variance)
 
     return out
+
+
+def gaussian2kp(heatmap, kp_variance='matrix', clip_variance=None):
+    return heatmap

@@ -3,7 +3,7 @@ import os
 import yaml
 # import matplotlib
 # import imageio
-# import torch
+import torch
 # import numpy as np
 from argparse import ArgumentParser
 
@@ -22,8 +22,10 @@ from library.modules.keypoint_detector import KPDetector
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--config", required=True, help="path to config")
-    parser.add_argument("--checkpoint", required=True, help="path to checkpoint")
+    # parser.add_argument("--config", required=True, help="path to config")
+    parser.add_argument("--config", default='../../config/monkeynet/moving-gif.yaml', help="path to config")
+    # parser.add_argument("--checkpoint", required=True, help="path to checkpoint")
+    parser.add_argument("--checkpoint", default=None, help="path to checkpoint")
     parser.add_argument("--source_image", default="sup-mat/source.png", help="path to source image")
     parser.add_argument("--driving_video", default="sup-mat/driving.png", help="path to driving video")
     parser.add_argument("--out_file", default="demo.gif", help="path to out file")
@@ -37,6 +39,15 @@ if __name__ == "__main__":
 
     kp_detector = KPDetector(**config['model_params']['common_params'],
                              **config['model_params']['kp_detector_params'])
+
+    if not opt.cpu:
+        kp_detector = kp_detector.cuda()
+
+    kp_detector.eval()
+
+    with torch.no_grad():
+        in_tensor = torch.rand((1, 3, 3, 256, 256), dtype=torch.float32).cuda()
+        out_tensorf = kp_detector(in_tensor)
 
     # generator = MotionTransferGenerator(**config['model_params']['common_params'],
     #                                     **config['model_params']['generator_params'])

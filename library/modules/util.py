@@ -46,9 +46,9 @@ class Decoder(nn.Module):
         up_blocks = []
         for i in range(num_blocks)[::-1]:
             up_blocks.append(UpBlock3D(
-                (1 if i == num_blocks - 1 else 2) * min(
+                in_features=(1 if i == num_blocks - 1 else 2) * min(
                     max_features, block_expansion * (2 ** (i + 1))) + additional_features_for_block,
-                min(max_features, block_expansion * (2 ** i)),
+                out_features=min(max_features, block_expansion * (2 ** i)),
                 kernel_size=kernel_size, padding=padding))
 
         self.up_blocks = nn.ModuleList(up_blocks)
@@ -102,6 +102,26 @@ class DownBlock3D(nn.Module):
         out = self.norm(out)
         out = F.relu(out)
         out = self.pool(out)
+        return out
+
+
+class UpBlock3D(nn.Module):
+    """
+    Simple block for processing video (decoder).
+    """
+
+    def __init__(self, in_features, out_features, kernel_size=3, padding=1):
+        super(UpBlock3D, self).__init__()
+
+        self.conv = nn.Conv3d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
+                              padding=padding)
+        self.norm = BatchNorm3d(out_features, affine=True)
+
+    def forward(self, x):
+        out = F.interpolate(x, scale_factor=(1, 2, 2))
+        out = self.conv(out)
+        out = self.norm(out)
+        out = F.relu(out)
         return out
 
 
