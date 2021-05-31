@@ -1,8 +1,9 @@
-# import torch
+import torch
 import torch.nn.functional as F
 from torch import nn
 
 from library.utils.keypoint import kp2gaussian
+from library.utils.flow import make_coordinate_grid
 
 
 class MovementEmbeddingModule(nn.Module):
@@ -52,5 +53,66 @@ class MovementEmbeddingModule(nn.Module):
         inputs = []
         if self.use_heatmap:
             heatmap = self.normalize_heatmap(
-                kp2gaussian(kp_driving, spatial_size=spatial_size, kp_variance=self.kp_variance))
+                kp2gaussian(kp_driving, spatial_size=spatial_size, kp_variance=self.kp_variance))  # (1, 3, kp, H/2, W/2)
 
+            if self.heatmap_type == 'difference':
+                heatmap_appearance = self.normalize_heatmap(
+                    kp2gaussian(kp_source, spatial_size=spatial_size, kp_variance=self.kp_variance))
+                heatmap = heatmap - heatmap_appearance
+
+            if self.add_bg_feature_map:
+                zeros = torch.zeros(bs, d, 1, h, w).type(heatmap.type())  # (N, 3, 1, H/2, W/2)
+                heatmap = torch.cat([zeros, heatmap], dim=2)  # (N, 3, kp+1, H/2, W/2)
+
+            heatmap = heatmap.unsqueeze(3)  # (N, 3, kp+1, 1, H/2, W/2)
+            inputs.append(heatmap)
+
+        num_kp += self.add_bg_feature_map
+        kp_video_diff = None
+        if self.use_difference or self.use_deformed_source_image:
+            kp_video_diff = kp_source['mean'] - kp_driving['mean']              # (N, 3, kp, 2)
+
+            if self.add_bg_feature_map:
+                zeros = torch.zeros(bs, d, 1, 2).type(kp_video_diff.type())     # (N, 3, 1, 2)
+                kp_video_diff = torch.cat([zeros, kp_video_diff], dim=2)       # (N, 3, kp+1, 2)
+            kp_video_diff = kp_video_diff.view((bs, d, num_kp, 2, 1, 1)).repeat(1, 1, 1, 1, h, w)
+            # (N, 3, kp+1, 2, H/2, W/2)
+
+        if self.use_difference:
+            inputs.append(kp_video_diff)
+
+        if self.use_deformed_source_image:
+            appearance_repeat = source_image.unsqueeze(1).unsqueeze(1).repeat(1, d, num_kp, 1, 1, 1, 1)
+            # (N, 3, kp+1, 3, 3, H/2, W/2)
+            appearance_repeat = appearance_repeat.view(bs * d * num_kp, -1, h, w)  # (N*3*(kp+1), 3*3, H/2, W/2)
+
+            deformation_approx = kp_video_diff.view((bs * d * num_kp, -1, h, w)).permute(0, 2, 3, 1)
+            # (N * 3 * (kp+1), H/2, W/2, 2)
+            coordinate_grid = make_coordinate_grid((h, w), dtype=deformation_approx.type())  # (H/2, W/2, 2)
+            coordinate_grid = coordinate_grid.view(1, h, w, 2)  # (1, H/2, W/2, 2)
+            deformation_approx = coordinate_grid + deformation_approx  # (N * 3 * (kp+1), H/2, W/2, 2)
+
+            appearance_approx_deform = F.grid_sample(appearance_repeat, deformation_approx)
+            appearance_approx_deform = appearance_approx_deform.view((bs, d, num_kp, -1, h, w))
+            # (N, 3, (kp+1), 3*3, H/2, W/2)
+            inputs.append(appearance_approx_deform)
+
+        movement_encoding = torch.cat(inputs, dim=3)
+        movement_encoding = movement_encoding.view(bs, d, -1, h, w)
+        movement_encoding = movement_encoding.permute(0, 2, 1, 3, 4)
+
+        return movement_encoding
+
+
+class IdentityDeformation(nn.Module):
+    @staticmethod
+    def forward(appearance_frame, kp_video, _):
+        bs, _, _, h, w = appearance_frame.shape  # (N, 3, 3, H, W)
+        _, d, num_kp, _ = kp_video['mean'].shape    # (N, 3, kp, 2)
+        coordinate_grid = make_coordinate_grid((h, w), dtype=appearance_frame.type())  # (H, W, 2)
+        coordinate_grid = coordinate_grid.view(1, 1, h, w, 2).repeat(bs, d, 1, 1, 1)   # (N, 3, H, W, 2)
+
+        z_coordinate = torch.zeros(coordinate_grid.shape[:-1] + (1,)).type(coordinate_grid.type())  # (N, 3, H, W, 1)
+        out = torch.cat([coordinate_grid, z_coordinate], dim=-1)  # (N, 3, H, W, 3)
+
+        return out

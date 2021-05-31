@@ -26,11 +26,11 @@ class MotionTransferGenerator(nn.Module):
             self.kp_embedding_module = None
             embedding_features = 0
 
-        # if dense_motion_params is not None:
-        #     self.dense_motion_module = DenseMotionModule(
-        #         num_kp=num_kp, kp_variance=kp_variance, num_channels=num_channels, **dense_motion_params)
-        # else:
-        #     self.dense_motion_module = IdentityDeformation()
+        if dense_motion_params is not None:
+            self.dense_motion_module = DenseMotionModule(
+                num_kp=num_kp, kp_variance=kp_variance, num_channels=num_channels, **dense_motion_params)
+        else:
+            self.dense_motion_module = IdentityDeformation()
 
     def forward(self, x):
         return x
