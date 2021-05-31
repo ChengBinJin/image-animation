@@ -39,6 +39,8 @@ if __name__ == "__main__":
 
     kp_detector = KPDetector(**config['model_params']['common_params'],
                              **config['model_params']['kp_detector_params'])
+    generator = MotionTransferGenerator(**config['model_params']['common_params'],
+                                        **config['model_params']['generator_params'])
 
     if not opt.cpu:
         kp_detector = kp_detector.cuda()
@@ -46,11 +48,15 @@ if __name__ == "__main__":
     kp_detector.eval()
 
     with torch.no_grad():
-        in_tensor = torch.rand((1, 3, 3, 256, 256), dtype=torch.float32).cuda()
-        out_tensorf = kp_detector(in_tensor)
+        source_image_tensor = torch.rand((1, 3, 3, 256, 256), dtype=torch.float32).cuda()
+        driving_image_tensor = torch.rand((1, 3, 3, 256, 256), dtype=torch.float32).cuda()
+        kp_source_tensor = kp_detector(source_image_tensor)
+        kp_driving_tensor = kp_detector(driving_image_tensor)
 
-    # generator = MotionTransferGenerator(**config['model_params']['common_params'],
-    #                                     **config['model_params']['generator_params'])
+        for key, value in kp_source_tensor.items():
+            print(f'key: {key}, value shape: {value.shape}')
+
+        generator.kp_embedding_module(source_image_tensor, kp_source_tensor, kp_driving_tensor)
 
     print(f"Hello world!")
 

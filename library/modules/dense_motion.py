@@ -2,7 +2,7 @@
 import torch.nn.functional as F
 from torch import nn
 
-from library.modules.keypoint_detector import kp2gaussian
+from library.utils.keypoint import kp2gaussian
 
 
 class MovementEmbeddingModule(nn.Module):
@@ -29,16 +29,28 @@ class MovementEmbeddingModule(nn.Module):
         self.norm_const = norm_const
         self.scale_factor = scale_factor
 
+    def normalize_heatmap(self, heatmap):
+        if self.norm_const == "sum":
+            heatmap_shape = heatmap.shape   # (1, 3, kp, H/2, W/2)
+            heatmap = heatmap.view(heatmap_shape[0], heatmap_shape[1], heatmap_shape[2], -1)    # (1, 3, kp, H/2*W/2)
+            heatmap = heatmap / heatmap.sum(dim=3, keepdim=True)
+            out = heatmap.view(*heatmap_shape)  # (1, 3, kp, H/2, W/2)
+        else:
+            out = heatmap / self.norm_const     # (1, 3, kp, H/2, W/2)
+
+        return out
+
     def forward(self, source_image, kp_driving, kp_source):
         if self.scale_factor != 1:
-            source_image = F.interpolate(source_image, scale_factor=(1, self.sacle_factor, self.scale_factor))
+            source_image = F.interpolate(source_image, scale_factor=(1, self.scale_factor, self.scale_factor))
 
-        spatial_size = source_image.shape[3:]
+        spatial_size = source_image.shape[3:]       # (H/2, W/2)
 
-        bs, _, _, h, w = source_image.shape
-        _, d, num_kp, _ = kp_driving['mean'].shape
+        bs, _, _, h, w = source_image.shape         # (N, 3, 3, H/2, W/2)
+        _, d, num_kp, _ = kp_driving['mean'].shape  # (N, 3, kp, 2)
 
-        # inputs = []
-        # if self.use_heatmap:
-        #     heatmap = self.normalize_heatmap(
-        #         kp2guassian(kp_driving, spatial_size=spatial_size, kp_variance=self.kp_variance))
+        inputs = []
+        if self.use_heatmap:
+            heatmap = self.normalize_heatmap(
+                kp2gaussian(kp_driving, spatial_size=spatial_size, kp_variance=self.kp_variance))
+

@@ -1,8 +1,8 @@
 # import torch
 from torch import nn
 
-from library.modules.util import Encoder
-from library.modules.movement_embedding import MovementEmbeddingModule
+from library.modules.block import Encoder
+from library.modules.dense_motion import MovementEmbeddingModule
 
 
 class MotionTransferGenerator(nn.Module):
@@ -19,11 +19,18 @@ class MotionTransferGenerator(nn.Module):
                                           num_blocks=num_blocks)
 
         if kp_embedding_params is not None:
-            self.kp_embedding_module = MovementEmbeddingModule(num_kp=num_kp, kp_variance=kp_variance,
-                                                               num_channels=num_channels, **kp_embedding_params)
+            self.kp_embedding_module = MovementEmbeddingModule(
+                num_kp=num_kp, kp_variance=kp_variance, num_channels=num_channels, **kp_embedding_params)
             embedding_features = self.kp_embedding_module.out_channels
+        else:
+            self.kp_embedding_module = None
+            embedding_features = 0
 
-        print(" [!] Initialize MotionTransferGenerator!")
+        # if dense_motion_params is not None:
+        #     self.dense_motion_module = DenseMotionModule(
+        #         num_kp=num_kp, kp_variance=kp_variance, num_channels=num_channels, **dense_motion_params)
+        # else:
+        #     self.dense_motion_module = IdentityDeformation()
 
     def forward(self, x):
         return x
