@@ -4,6 +4,7 @@ from torch import nn
 
 from library.utils.keypoint import kp2gaussian
 from library.utils.flow import make_coordinate_grid
+from library.modules.block import SameBlock3D, Hourglass
 
 
 class MovementEmbeddingModule(nn.Module):
@@ -12,7 +13,7 @@ class MovementEmbeddingModule(nn.Module):
     """
 
     def __init__(self, num_kp, kp_variance, num_channels, use_deformed_source_image=False, use_difference=False,
-                 use_heatmap=True, add_bg_feature_map=False, heatmap_type="gaussian", norm_const="sum", scale_factor=1):
+                 use_heatmap=True, add_bg_feature_map=False, heatmap_type="guassian", norm_const="sum", scale_factor=1):
         super(MovementEmbeddingModule, self).__init__()
 
         assert heatmap_type in ['guassian', 'difference']
@@ -102,6 +103,47 @@ class MovementEmbeddingModule(nn.Module):
         movement_encoding = movement_encoding.permute(0, 2, 1, 3, 4)
 
         return movement_encoding
+
+
+class DenseMotionModule(nn.Module):
+    """
+    Module that predicting a dense optical flow only from the displacement of a keypoints and the appearance of the
+    first frame
+    """
+
+    def __init__(self, block_expansion, num_blocks, max_features, mask_embedding_params, num_kp, num_channels,
+                 kp_variance, use_correction, use_mask, bg_init=2, num_group_blocks=0, scale_factor=1):
+        super(DenseMotionModule, self).__init__()
+
+        self.mask_embedding = MovementEmbeddingModule(
+            num_kp=num_kp, kp_variance=kp_variance, num_channels=num_channels, add_bg_feature_map=True,
+            **mask_embedding_params)
+        self.difference_embedding = MovementEmbeddingModule(
+            num_kp=num_kp, kp_variance=kp_variance, num_channels=num_channels, add_bg_feature_map=True,
+            use_difference=True, use_heatmap=False, use_deformed_source_image=False)
+
+        group_blocks = []
+        for i in range(num_group_blocks):
+            # (self, in_features, out_features, groups=None, kernel_size=3, padding=1)
+            group_blocks.append(
+                SameBlock3D(in_features=self.mask_embedding.out_channels, out_features=self.mask_embedding.out_channels,
+                            groups=num_kp+1, kernel_size=(1, 1, 1), padding=(0, 0, 0)))
+        self.group_blocks = nn.ModuleList(group_blocks)
+
+        self.hourglass = Hourglass(block_expansion=block_expansion, in_features=self.mask_embedding.out_channels,
+                                   out_features=(num_kp + 1) * use_mask + 2 * use_correction, max_features=max_features,
+                                   num_blocks=num_blocks)
+        self.hourglass.decoder.conv.weight.data.zero_()  # the last conv of decoder in hourglass
+
+        bias_init = ([bg_init] + [0] * num_kp) * use_mask + [0, 0] * use_correction
+        self.hourglass.decoder.conv.bias.data.copy_(torch.tensor(bias_init, dtype=torch.float))
+        # the last conv of decoder in hourglass
+
+        self.num_kp = num_kp
+        self.use_correction = use_correction
+        self.use_mask = use_mask
+        self.scale_factor = scale_factor
+
 
 
 class IdentityDeformation(nn.Module):

@@ -125,6 +125,25 @@ class UpBlock3D(nn.Module):
         return out
 
 
+class SameBlock3D(nn.Module):
+    """
+    Simple block with group convoluiton
+    """
+
+    def __init__(self, in_features, out_features, groups=None, kernel_size=3, padding=1):
+        super(SameBlock3D, self).__init__()
+
+        self.conv = nn.Conv3d(
+            in_channels=in_features, out_channels=out_features, kernel_size=kernel_size, padding=padding, groups=groups)
+        self.norm = BatchNorm3d(num_features=out_features, affine=True)
+
+    def forward(self, x):
+        out = self.conv(x)
+        out = self.norm(out)
+        out = F.relu(out)
+
+        return out
+
 
 
 

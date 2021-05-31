@@ -2,7 +2,7 @@
 from torch import nn
 
 from library.modules.block import Encoder
-from library.modules.dense_motion import MovementEmbeddingModule
+from library.modules.dense_motion import MovementEmbeddingModule, DenseMotionModule, IdentityDeformation
 
 
 class MotionTransferGenerator(nn.Module):
