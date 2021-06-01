@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 from torch import nn
 
 from library.modules.block import Encoder, Decoder, ResBlock3D
@@ -42,6 +43,24 @@ class MotionTransferGenerator(nn.Module):
         for i in range(num_refinement_blocks):
             self.refinement_module.add_module(
                 'r' + str(i), ResBlock3D(in_features, kernel_sizes=(1, 3, 3), padding=(0, 1, 1)))
+        self.refinement_module.add_module(
+            'conv-last', nn.Conv3d(in_channels=in_features, out_channels=num_channels, kernel_size=1, padding=0))
+        self.interpolation_mode = interpolation_mode
 
-    def forward(self, x):
-        return x
+    def deform_input(self, inp, deformations_absolute):
+        bs, d, h_old, w_old, _ = deformations_absolute.shape
+        _, _, _, h, w = inp.shape
+        deformations_absolute = deformations_absolute.permute(0, 4, 1, 2, 3)
+        deformation = F.interpolate(deformations_absolute, size=(d, h, w), mode=self.interpolation_mode)
+        deformation = deformation.permute(0, 2, 3, 4, 1)
+        deformed_inp = F.grid_sample(inp, deformation)
+        return deformed_inp
+
+    def forward(self, source_image, kp_driving, kp_source):
+        appearance_skips = self.appearance_encoder(source_image)
+
+        deformations_absolute = self.dense_motion_module(
+            source_image=source_image, kp_driving=kp_driving, kp_source=kp_source)
+
+        deformed_skips = [self.deform_input(skip, deformations_absolute) for skip in appearance_skips]
+
