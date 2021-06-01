@@ -13,10 +13,10 @@ class MovementEmbeddingModule(nn.Module):
     """
 
     def __init__(self, num_kp, kp_variance, num_channels, use_deformed_source_image=False, use_difference=False,
-                 use_heatmap=True, add_bg_feature_map=False, heatmap_type="guassian", norm_const="sum", scale_factor=1):
+                 use_heatmap=True, add_bg_feature_map=False, heatmap_type="gaussian", norm_const="sum", scale_factor=1):
         super(MovementEmbeddingModule, self).__init__()
 
-        assert heatmap_type in ['guassian', 'difference']
+        assert heatmap_type in ['gaussian', 'difference']
         assert int(use_heatmap) + int(use_deformed_source_image) + int(use_difference) >= 1
 
         self.out_channels = (1 * use_heatmap + 2 * use_difference + num_channels * use_deformed_source_image) * (
@@ -98,9 +98,9 @@ class MovementEmbeddingModule(nn.Module):
             # (N, 3, (kp+1), 3*3, H/2, W/2)
             inputs.append(appearance_approx_deform)
 
-        movement_encoding = torch.cat(inputs, dim=3)
-        movement_encoding = movement_encoding.view(bs, d, -1, h, w)
-        movement_encoding = movement_encoding.permute(0, 2, 1, 3, 4)
+        movement_encoding = torch.cat(inputs, dim=3)  # (N, 3, 11, 1+2+9, H/2, W/2)
+        movement_encoding = movement_encoding.view(bs, d, -1, h, w)     # (N, 3, 11*(1+2+9), H/2, W/2)
+        movement_encoding = movement_encoding.permute(0, 2, 1, 3, 4)    # (N, 11*(1+2+9), 3, H/2, W/2)
 
         return movement_encoding
 
@@ -144,6 +144,42 @@ class DenseMotionModule(nn.Module):
         self.use_mask = use_mask
         self.scale_factor = scale_factor
 
+    def forward(self, source_image, kp_driving, kp_source):
+        if self.scale_factor != 1:
+            source_image = F.interpolate(source_image, scale_factor=(1, self.scale_factor, self.scale_factor))
+
+        prediction = self.mask_embedding(source_image, kp_driving, kp_source)  # (N, 11*(1+2+9), 3, H/2, W/2)
+        for block in self.group_blocks:
+            prediction = block(prediction)
+            prediction = F.leaky_relu(prediction, 0.2)
+        prediction = self.hourglass(prediction)
+
+        bs, _, d, h, w = prediction.shape
+        if self.use_mask:
+            mask = prediction[:, :(self.num_kp + 1)]
+            mask = F.softmax(mask, dim=1)
+            mask = mask.unsqueeze(2)
+            difference_embedding = self.difference_embedding(source_image, kp_driving, kp_source)
+            difference_embedding = difference_embedding.view(bs, self.num_kp + 1, 2, d, h, w)
+            deformations_relative = (difference_embedding * mask).sum(dim=1)
+        else:
+            deformations_relative = 0
+
+        if self.use_correction:
+            correction = prediction[:, -2:]
+        else:
+            correction = 0
+
+        deformations_relative = deformations_relative + correction
+        deformations_relative = deformations_relative.permute(0, 2, 3, 4, 1)
+
+        coordinate_grid = make_coordinate_grid((h, w), dtype=deformations_relative.type())
+        coordinate_grid = coordinate_grid.view(1, 1, h, w, 2)
+        deformation = deformations_relative + coordinate_grid
+        z_coordinate = torch.zeros(deformation.shape[:-1] + (1,)).type(deformation.type())
+        out = torch.cat([deformation, z_coordinate], dim=-1)
+
+        return out
 
 
 class IdentityDeformation(nn.Module):

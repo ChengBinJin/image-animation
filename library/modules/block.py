@@ -145,8 +145,31 @@ class SameBlock3D(nn.Module):
         return out
 
 
+class ResBlock3D(nn.Module):
+    """
+    Res block, preserve spatial resolution.
+    """
 
+    def __init__(self, in_features, kernel_size, padding):
+        super(ResBlock3D, self).__init__()
+        self.conv1 = nn.Conv3d(
+            in_channels=in_features, out_channels=in_features, kernel_size=kernel_size, padding=padding)
+        self.conv2 = nn.Conv3d(
+            in_channels=in_features, out_channels=in_features, kernel_size=kernel_size, padding=padding)
+        self.norm1 = BatchNorm3d(in_features, affine=True)
+        self.norm2 = BatchNorm3d(in_features, affine=True)
 
+    def forward(self, x):
+        out = self.norm1(x)
+        out = F.relu(out)
+        out = self.conv1(out)
+
+        out = self.norm2(out)
+        out = F.relu(out)
+        out = self.conv2(out)
+        out += x
+
+        return out
 
 
 

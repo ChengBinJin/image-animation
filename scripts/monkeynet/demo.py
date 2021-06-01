@@ -56,7 +56,7 @@ if __name__ == "__main__":
         for key, value in kp_source_tensor.items():
             print(f'key: {key}, value shape: {value.shape}')
 
-        generator.kp_embedding_module(source_image_tensor, kp_source_tensor, kp_driving_tensor)
+        generator.dense_motion_module(source_image_tensor, kp_source_tensor, kp_driving_tensor)
 
     print(f"Hello world!")
 
