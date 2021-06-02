@@ -64,3 +64,19 @@ class MotionTransferGenerator(nn.Module):
 
         deformed_skips = [self.deform_input(skip, deformations_absolute) for skip in appearance_skips]
 
+        if self.kp_embedding_module is not None:
+            d = kp_driving['mean'].shape[1]
+            movement_embedding = self.kp_embedding_module(
+                source_image=source_image, kp_driving=kp_driving, kp_source=kp_source)
+            kp_skips = [F.interpolate(movement_embedding, size=(d,) + skip.shape[3:], mode=self.interpolation_mode)
+                        for skip in appearance_skips]
+            skips = [torch.cat([a, b], dim=1) for a, b in zip(deformed_skips, kp_skips)]
+        else:
+            skips = deformed_skips
+
+        video_deformed = self.deform_input(source_image, deformations_absolute)
+        video_prediction = self.video_decoder(skips)
+        video_prediction = self.refinement_module(video_prediction)
+        video_prediction = torch.sigmoid(video_prediction)
+
+        return {"video_prediction": video_prediction, "video_deformed": video_deformed}

@@ -12,9 +12,9 @@ project_dir = os.path.split(source_file_dir)[0]
 sys.path.append(project_dir)
 
 # from transfer import transfer_one
-# from logger import Logger
 from library.modules.generator import MotionTransferGenerator
 from library.modules.keypoint_detector import KPDetector
+from library.utils.logger.logger import Logger
 # from sync_batchnorm import DataParallelWithCallback
 # from frames_dataset import read_video
 # from augmentation import VideoToTensor
@@ -44,6 +44,9 @@ if __name__ == "__main__":
 
     if not opt.cpu:
         kp_detector = kp_detector.cuda()
+        generator = generator.cuda()
+
+    Logger.load_cpk(opt.checkpoint, generator=generator, kp_detector=kp_detector)
 
     kp_detector.eval()
 
