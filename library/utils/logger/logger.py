@@ -1,4 +1,5 @@
 import os
+import imageio
 import torch
 import numpy as np
 
@@ -18,6 +19,7 @@ class Logger:
         self.epoch = 0
         self.best_loss = float('inf')
         self.names = None
+        self.models = None
 
     def log_scores(self, loss_names):
         loss_mean = np.array(self.loss_list).mean(axis=0)
@@ -28,6 +30,17 @@ class Logger:
         print(loss_string, file=self.log_file)
         self.loss_list = []
         self.log_file.flush()
+
+    def visualize_rec(self, inp, out):
+        image = self.visualizer.visualize(inp['source'], inp['driving'], out)
+        imageio.imsave(os.path.join(self.visualizations_dir, "%s-rec.png" % str(self.epoch).zfill(self.zfill_num)), image)
+
+    def save_cpk(self, emergent=False):
+        cpk = {k: v.state_dict() for k, v in self.models.items()}
+        cpk['epoch'] = self.epoch
+        cpk_path = os.path.join(self.cpk_dir, '%s-checkpoint.pth.tar' % str(self.epoch).zfill(self.zfill_num))
+        if not (os.path.exists(cpk_path) and emergent):
+            torch.save(cpk, cpk_path)
 
     @staticmethod
     def load_cpk(checkpoint_path, generator=None, discriminator=None, kp_detector=None, optimizer_generator=None,
@@ -55,4 +68,12 @@ class Logger:
                 print("No discriminator optimizer in that state-dict. Optimizer will be not initialized")
 
         return checkpoint['epoch']
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_tye, exc_val, exc_tb):
+        if 'models' in self.__dict__:
+            self.save_cpk()
+        self.log_file.close()
 
