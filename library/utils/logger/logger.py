@@ -1,5 +1,6 @@
 import os
 import imageio
+import collections
 import torch
 import numpy as np
 
@@ -77,3 +78,16 @@ class Logger:
             self.save_cpk()
         self.log_file.close()
 
+    def log_iter(self, losses):
+        losses = collections.OrderedDict(losses.items())
+        if self.names is None:
+            self.names = list(losses.keys())
+        self.loss_list.append(list(losses.values()))
+
+    def log_epoch(self, epoch, models, inp, out):
+        self.epoch = epoch
+        self.models = models
+        if (self.epoch + 1) % self.checkpoint_freq == 0:
+            self.save_cpk()
+        self.log_scores(self.names)
+        self.visualize_rec(inp, out)
