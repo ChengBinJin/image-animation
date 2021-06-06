@@ -1,8 +1,8 @@
 import os
 import imageio
-import collections
 import torch
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 class Logger:
@@ -89,3 +89,8 @@ class Logger:
         if self.epoch % self.checkpoint_freq == 0:
             self.save_cpk()
 
+class Visualizer:
+    def __init__(self, kp_size=2, draw_border=False, colormap='gist_rainbow'):
+        self.kp_size = kp_size
+        self.draw_border = draw_border
+        self.colormap = plt.get_cmap(colormap)
