@@ -6,7 +6,8 @@ import numpy as np
 
 
 class Logger:
-    def __init__(self, log_dir, checkpoint_freq=100, visualizer_params=None, zfill_num=5, log_file_name="log.txt"):
+    def __init__(self, log_dir, log_file_name="log.txt", log_freq_iter=100, cpk_freq_epoch=100, zfill_num=5,
+                 visualizer_params=None):
 
         self.loss_list = []
         self.cpk_dir = log_dir
@@ -14,11 +15,13 @@ class Logger:
         if not os.path.exists(self.visualizations_dir):
             os.makedirs(self.visualizations_dir)
         self.log_file = open(os.path.join(log_dir, log_file_name), 'a')
+        self.log_freq = log_freq_iter
+        self.checkpoint_freq = cpk_freq_epoch
         self.zfill_num = zfill_num
         self.visualizer = Visualizer(**visualizer_params)
-        self.checkpoint_freq = checkpoint_freq
+
         self.epoch = 0
-        self.best_loss = float('inf')
+        self.it = 0
         self.names = None
         self.models = None
 
@@ -36,12 +39,12 @@ class Logger:
         image = self.visualizer.visualize(inp['source'], inp['driving'], out)
         imageio.imsave(os.path.join(self.visualizations_dir, "%s-rec.png" % str(self.epoch).zfill(self.zfill_num)), image)
 
-    def save_cpk(self, emergent=False):
+    def save_cpk(self):
         cpk = {k: v.state_dict() for k, v in self.models.items()}
         cpk['epoch'] = self.epoch
+        cpk['it'] = self.it
         cpk_path = os.path.join(self.cpk_dir, '%s-checkpoint.pth.tar' % str(self.epoch).zfill(self.zfill_num))
-        if not (os.path.exists(cpk_path) and emergent):
-            torch.save(cpk, cpk_path)
+        torch.save(cpk, cpk_path)
 
     @staticmethod
     def load_cpk(checkpoint_path, generator=None, discriminator=None, kp_detector=None, optimizer_generator=None,
@@ -53,22 +56,16 @@ class Logger:
         if generator is not None:
             generator.load_state_dict(checkpoint['generator'])
         if discriminator is not None:
-            try:
-                discriminator.load_state_dict(checkpoint['discriminator'])
-            except:
-                print("No discriminator in the state-dict. Discriminator will be randomly initialized")
+            discriminator.load_state_dict(checkpoint['discriminator'])
 
         if optimizer_kp_detector is not None:
             optimizer_kp_detector.load_state_dict(checkpoint['optimizer_kp_detector'])
         if optimizer_generator is not None:
             optimizer_generator.load_state_dict(checkpoint['optimizer_generator'])
         if optimizer_discriminator is not None:
-            try:
-                optimizer_discriminator.load_state_dict(checkpoint['optimizer_discriminator'])
-            except RuntimeError as e:
-                print("No discriminator optimizer in that state-dict. Optimizer will be not initialized")
+            optimizer_discriminator.load_state_dict(checkpoint['optimizer_discriminator'])
 
-        return checkpoint['epoch']
+        return checkpoint['epoch'], checkpoint['it']
 
     def __enter__(self):
         return self
@@ -78,16 +75,17 @@ class Logger:
             self.save_cpk()
         self.log_file.close()
 
-    def log_iter(self, losses):
-        losses = collections.OrderedDict(losses.items())
-        if self.names is None:
-            self.names = list(losses.keys())
-        self.loss_list.append(list(losses.values()))
+    def log_iter(self, it, names, values, inp, out):
+        self.it = it
+        self.names = names
+        self.loss_list.append(values)
+        if it % self.log_freq == 0:
+            self.log_scores(self.names)
+            self.visualize_rec(inp, out)
 
-    def log_epoch(self, epoch, models, inp, out):
+    def log_epoch(self, epoch, models):
         self.epoch = epoch
         self.models = models
-        if (self.epoch + 1) % self.checkpoint_freq == 0:
+        if self.epoch % self.checkpoint_freq == 0:
             self.save_cpk()
-        self.log_scores(self.names)
-        self.visualize_rec(inp, out)
+
