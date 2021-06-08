@@ -90,6 +90,7 @@ class Logger:
         if self.epoch % self.checkpoint_freq == 0:
             self.save_cpk()
 
+
 class Visualizer:
     def __init__(self, kp_size=2, draw_border=False, colormap='gist_rainbow'):
         self.kp_size = kp_size
@@ -107,3 +108,16 @@ class Visualizer:
                 rr, cc = circle(kp[1], kp[0], self.kp_size, shape=video_array.shape[1:3])
                 video_array[i][rr, cc] = np.array(self.colormap(kp_ind / num_kp))[:3]
         return video_array
+
+    def create_video_column_with_kp(self, video, kp):
+        video_array = np.array([self.draw_video_with_kp(v, k) for v, k in zip(video, kp)])
+        return self.create_video_column(video_array)
+
+    def create_video_column(self, videos):
+        if self.draw_border:
+            videos = np.copy(videos)
+            videos[:, :, [0, -1]] = (1, 1, 1)
+            videos[:, :, :, [0, -1]] = (1, 1, 1)
+        return np.concatenate(list(videos), axis=1)
+
+    
