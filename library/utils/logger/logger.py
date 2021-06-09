@@ -160,6 +160,31 @@ class Visualizer:
 
         return image
 
+    def visualize_reconstruction(self, inp, out):
+        out_video_batch = out['video_prediction'].data.cpu().numpy()
+        if 'driving' in inp:
+            gt_video_batch = inp['driving'].data.cpu().numpy()
+        else:
+            gt_video_batch = inp['video'].data.cpu().numpy()
 
+        appearance_deformed_batch = out['video_deformed'].data.cpu().numpy()
+        appearance_video_batch = inp['source'].data.cpu().repeat(
+            1, 1, out_video_batch.shape[2], 1, 1).numpy()
+
+        kp_video = out['kp_driving']['mean'].data.cpu().numpy()
+        kp_appearance = out['kp_source']['mean'].data.cpu().repeat(
+            1, out_video_batch.shape[2], 1, 1).numpy()
+
+        out_video_batch = np.transpose(out_video_batch, [0, 2, 3, 4, 1])
+        gt_video_batch = np.transpose(gt_video_batch, [0, 2, 3, 4, 1])
+        appearance_video_batch = np.transpose(appearance_video_batch, [0, 2, 3, 4, 1])
+        appearance_deformed_batch = np.transpose(appearance_deformed_batch, [0, 2, 3, 4, 1])
+
+        image = self.create_image_grid((appearance_video_batch, kp_appearance),
+                                       (gt_video_batch, kp_video),
+                                       out_video_batch, appearance_deformed_batch, gt_video_batch)
+        image = (255 * image).astype(np.uint8)
+
+        return image
 
 
