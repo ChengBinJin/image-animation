@@ -16,7 +16,7 @@ from library.modules.generator import MotionTransferGenerator
 from library.modules.keypoint_detector import KPDetector
 from library.utils.logger.logger import Logger
 # from sync_batchnorm import DataParallelWithCallback
-# from frames_dataset import read_video
+from library.dataset.frames_dataset import read_video
 # from augmentation import VideoToTensor
 
 
@@ -49,17 +49,11 @@ if __name__ == "__main__":
     Logger.load_cpk(opt.checkpoint, generator=generator, kp_detector=kp_detector)
 
     kp_detector.eval()
+    generator.eval()
 
     with torch.no_grad():
-        source_image_tensor = torch.rand((1, 3, 3, 256, 256), dtype=torch.float32).cuda()
-        driving_image_tensor = torch.rand((1, 3, 3, 256, 256), dtype=torch.float32).cuda()
-        kp_source_tensor = kp_detector(source_image_tensor)
-        kp_driving_tensor = kp_detector(driving_image_tensor)
-
-        for key, value in kp_source_tensor.items():
-            print(f'key: {key}, value shape: {value.shape}')
-
-        generator.dense_motion_module(source_image_tensor, kp_source_tensor, kp_driving_tensor)
+        driving_video = VideoToTensor()(read_video(opt.driving_video, opt.image_shape + (3,)))['video']
+        source_image = VideoToTensor()(read_video(opt.source_image, opt.image_shape + (3,)))['video'][:, :1]
 
     print(f"Hello world!")
 
