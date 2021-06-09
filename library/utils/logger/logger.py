@@ -120,4 +120,46 @@ class Visualizer:
             videos[:, :, :, [0, -1]] = (1, 1, 1)
         return np.concatenate(list(videos), axis=1)
 
-    
+    def create_image_grid(self, *args):
+        out = []
+        for arg in args:
+            if type(arg) == tuple:
+                out.append(self.create_video_column_with_kp(arg[0], arg[1]))
+            else:
+                out.append(self.create_video_column(arg))
+        return np.concatenate(out, axis=2)
+
+    def visualize_transfer(self, driving_video, source_image, out):
+        out_video_batch = out['video_prediction'].data.cpu().numpy()
+        appearance_deformed_batch = out['video_deformed'].data.cpu().numpy()
+        motion_video_batch = driving_video.data.cpu().num()
+        appearance_video_batch = source_image[:, :, 0:1].data.cpu().repeat(
+            1, 1, out_video_batch.shape[2], 1, 1).numpy()
+        video_first_frame = driving_video[:, :, 0:1].data.cpu().repeat(
+            1, 1, out_video_batch.shape[2], 1, 1).numpy()
+
+        kp_video = out['kp_driving']['mean'].data.cpu().numpy()
+        kp_appearance = out['kp_source']['mean'].data().cpu().repeat(
+            1, out_video_batch.shape[2], 1, 1).numpy()
+        kp_norm = out['kp_norm']['mean'].data.cpu().numpy()
+        kp_video_first = out['kp_driving']['mean'][:, :1].data.cpu().repeat(
+            1, out_video_batch.shape[2], 1, 1).numpy()
+
+        video_first_frame = np.transpose(video_first_frame, [0, 2, 3, 4, 1])
+        out_video_batch = np.transpose(out_video_batch, [0, 2, 3, 4, 1])
+        motion_video_batch = np.transpose(motion_video_batch, [0, 2, 3, 4, 1])
+        appearance_video_batch = np.transpose(appearance_video_batch, [0, 2, 3, 4, 1])
+        appearance_deformed_batch = np.transpose(appearance_deformed_batch, [0, 2, 3, 4, 1])
+
+        image = self.create_image_grid((appearance_video_batch, kp_appearance),
+                                       (video_first_frame, kp_video_first),
+                                       (motion_video_batch, kp_video),
+                                       (out_video_batch, kp_norm),
+                                       out_video_batch, appearance_video_batch)
+        image = (255 * image).astype(np.uint8)
+
+        return image
+
+
+
+
