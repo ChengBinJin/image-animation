@@ -17,7 +17,7 @@ from library.modules.keypoint_detector import KPDetector
 from library.utils.logger.logger import Logger
 # from sync_batchnorm import DataParallelWithCallback
 from library.dataset.frames_dataset import read_video
-# from augmentation import VideoToTensor
+from library.dataset.augmentation import VideoToTensor
 
 
 if __name__ == "__main__":
