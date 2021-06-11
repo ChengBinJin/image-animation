@@ -1,5 +1,7 @@
 import torch
+import numpy as np
 
+from scipy.spatial import ConvexHull
 from library.utils.matrix import matrix_inverse, smallest_singular
 from library.utils.flow import make_coordinate_grid
 
@@ -73,3 +75,42 @@ def gaussian2kp(heatmap, kp_variance='matrix', clip_variance=None):
         kp['var'] = var
 
     return kp
+
+
+def normalize_kp(kp_video, kp_appearance, movement_mult=False, move_location=False, adapt_variance=False,
+                 clip_mean=False):
+    if movement_mult:
+        appearance_area = ConvexHull(kp_appearance['mean'][0, 0].data.cpu().numpy()).volume
+        video_area = ConvexHull(kp_video['mean'][0, 0].data.cpu().numpy()).volume
+        movement_mult = np.sqrt(appearance_area) / np.sqrt(video_area)
+    else:
+        movement_mult = 1
+
+    kp_video = {k: v for k, v in kp_video.items()}
+
+    if move_location:
+        kp_video_diff = (kp_video['mean'] - kp_video['mean'][:, 0:1])
+        kp_video_diff *= movement_mult
+        kp_video['mean'] = kp_video_diff + kp_appearance['mean']
+
+    if clip_mean:
+        one = torch.ones(1).type(kp_video_diff.type())
+        kp_video['mean'] = torch.max(kp_video['mean'], -one)
+        kp_video['mean'] = torch.min(kp_video['mean'], one)
+
+    if ('var' in kp_video) and adapt_variance:
+        var_first = kp_video['var'][:, 0:1].repeat(1, kp_video['var'].shape[1], 1, 1, 1)
+        kp_var, _ = torch.gesv(var_first, kp_video['var'])
+
+        kp_var = torch.matmul(kp_video['var'], matrix_inverse(kp_video['var'][:, 0:1], eps=0))
+        kp_var = torch.matmul(kp_var, kp_appearance['var'])
+
+        kp_var = make_symetric_matrix(kp_var)
+        kp_video['var'] = kp_var
+
+    return kp_video
+
+
+
+
+
