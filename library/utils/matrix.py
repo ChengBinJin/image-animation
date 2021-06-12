@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 
 
 def matrix_inverse(batch_of_matrix, eps=0):
@@ -34,3 +35,18 @@ def smallest_singular(batch_of_matrix):
     norm = torch.sqrt((s1 - s2) / 2)
 
     return norm
+
+
+def make_symetric_matrix(torch_matrix):
+    a = torch_matrix.cpu().numpy()
+    c = (a + np.transpose(a, (0, 1, 2, 4, 3))) / 2
+    d, u = np.linalg.eig(c)
+    d[d <= 0] = 1e-6
+    d_matrix = np.zeros_like(a)
+    d_matrix[..., 0, 0] = d[..., 0]
+    d_matrix[..., 1, 1] = d[..., 1]
+    res = np.matmul(np.matmul(u, d_matrix), np.transpose(u, (0, 1, 2, 4, 3)))
+    res = torch.from_numpy(res).type(torch_matrix.type())
+
+    return res
+
