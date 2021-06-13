@@ -4,6 +4,7 @@ import numpy as np
 from scipy.spatial import ConvexHull
 from library.utils.matrix import matrix_inverse, smallest_singular
 from library.utils.flow import make_coordinate_grid
+from library.utils.matrix import make_symetric_matrix
 
 
 def kp2gaussian(kp, spatial_size, kp_variance='matrix'):

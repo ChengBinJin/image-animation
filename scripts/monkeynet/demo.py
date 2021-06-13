@@ -1,10 +1,9 @@
 import sys
 import os
 import yaml
-# import matplotlib
-# import imageio
+import imageio
 import torch
-# import numpy as np
+import numpy as np
 from argparse import ArgumentParser
 
 source_file_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
@@ -58,9 +57,6 @@ if __name__ == "__main__":
         source_image = torch.from_numpy(source_image).unsqueeze(0)
 
         out = transfer_one(kp_detector, generator, source_image, driving_video, config['transfer_params'])
-
-
-
-
-    print(f"Hello world!")
-
+        out_video_batch = out['video_prediction'].data.cpu().numpy()
+        out_video_batch = np.transpose(out_video_batch, [0, 2, 3, 4, 1])[0]
+        imageio.mimsave(opt.out_file, (255 * out_video_batch).astype(np.uint8))
