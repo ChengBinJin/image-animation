@@ -44,7 +44,8 @@ class MovementEmbeddingModule(nn.Module):
 
     def forward(self, source_image, kp_driving, kp_source):
         if self.scale_factor != 1:
-            source_image = F.interpolate(source_image, scale_factor=(1, self.scale_factor, self.scale_factor))
+            source_image = F.interpolate(
+                source_image, scale_factor=(1, self.scale_factor, self.scale_factor), recompute_scale_factor=True)
 
         spatial_size = source_image.shape[3:]       # (H/2, W/2)
 
@@ -93,7 +94,7 @@ class MovementEmbeddingModule(nn.Module):
             coordinate_grid = coordinate_grid.view(1, h, w, 2)  # (1, H/2, W/2, 2)
             deformation_approx = coordinate_grid + deformation_approx  # (N * 3 * (kp+1), H/2, W/2, 2)
 
-            appearance_approx_deform = F.grid_sample(appearance_repeat, deformation_approx)
+            appearance_approx_deform = F.grid_sample(appearance_repeat, deformation_approx, align_corners=True)
             appearance_approx_deform = appearance_approx_deform.view((bs, d, num_kp, -1, h, w))
             # (N, 3, (kp+1), 3*3, H/2, W/2)
             inputs.append(appearance_approx_deform)
@@ -146,7 +147,7 @@ class DenseMotionModule(nn.Module):
 
     def forward(self, source_image, kp_driving, kp_source):
         if self.scale_factor != 1:
-            source_image = F.interpolate(source_image, scale_factor=(1, self.scale_factor, self.scale_factor))
+            source_image = F.interpolate(source_image, scale_factor=(1, self.scale_factor, self.scale_factor), recompute_scale_factor=True)
 
         prediction = self.mask_embedding(source_image, kp_driving, kp_source)  # (N, 11*(1+2+9), 3, H/2, W/2)
         for block in self.group_blocks:

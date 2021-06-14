@@ -26,7 +26,7 @@ class KPDetector(nn.Module):
 
     def forward(self, x):  # x shape: (N, t, 3, H, W)
         if self.scale_factor != 1:
-            x = F.interpolate(x, scale_factor=(1, self.scale_factor, self.scale_factor))
+            x = F.interpolate(x, scale_factor=(1, self.scale_factor, self.scale_factor), recompute_scale_factor=True)
 
         heatmap = self.predictor(x)     # [N, kp, 3, H/2, W/2]
         final_shape = heatmap.shape     # [N, kp, 3, H/2, W/2]

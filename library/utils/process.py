@@ -1,4 +1,5 @@
 import torch
+from library.utils.keypoint import normalize_kp
 
 
 def transfer_one(kp_detector, generator, source_image, driving_video, transfer_params):

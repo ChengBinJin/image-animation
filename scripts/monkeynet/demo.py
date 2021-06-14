@@ -16,14 +16,15 @@ from library.utils.logger.logger import Logger
 from library.utils.process import transfer_one
 from library.dataset.frames_dataset import read_video
 from library.dataset.augmentation import VideoToTensor
+from library.sync_batchnorm import DataParallelWithCallback
 
 
 if __name__ == "__main__":
     parser = ArgumentParser()
     # parser.add_argument("--config", required=True, help="path to config")
-    parser.add_argument("--config", default='../../config/monkeynet/moving-gif.yaml', help="path to config")
+    parser.add_argument("--config", default='config/monkeynet/moving-gif.yaml', help="path to config")
     # parser.add_argument("--checkpoint", required=True, help="path to checkpoint")
-    parser.add_argument("--checkpoint", default=None, help="path to checkpoint")
+    parser.add_argument("--checkpoint", default='checkpoints/monkeynet/moving-gif-ckp.pth.tar', help="path to checkpoint")
     parser.add_argument("--source_image", default="sup-mat/source.png", help="path to source image")
     parser.add_argument("--driving_video", default="sup-mat/driving.png", help="path to driving video")
     parser.add_argument("--out_file", default="demo.gif", help="path to out file")
@@ -46,12 +47,16 @@ if __name__ == "__main__":
 
     Logger.load_cpk(opt.checkpoint, generator=generator, kp_detector=kp_detector)
 
+    kp_detector = DataParallelWithCallback(kp_detector)
+    generator = DataParallelWithCallback(generator)
+
     kp_detector.eval()
     generator.eval()
+    image_shape = tuple(config['dataset_params']['image_shape'])[:-1]
 
     with torch.no_grad():
-        driving_video = VideoToTensor()(read_video(opt.driving_video, opt.image_shape + (3,)))['video']
-        source_image = VideoToTensor()(read_video(opt.source_image, opt.image_shape + (3,)))['video'][:, :1]
+        driving_video = VideoToTensor()(read_video(opt.driving_video, image_shape + (3,)))['video']
+        source_image = VideoToTensor()(read_video(opt.source_image, image_shape + (3,)))['video'][:, :1]
 
         driving_video = torch.from_numpy(driving_video).unsqueeze(0)
         source_image = torch.from_numpy(source_image).unsqueeze(0)

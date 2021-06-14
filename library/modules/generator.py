@@ -13,7 +13,7 @@ class MotionTransferGenerator(nn.Module):
     """
     def __init__(self, num_channels, num_kp, kp_variance, block_expansion, max_features, num_blocks,
                  num_refinement_blocks, dense_motion_params=None, kp_embedding_params=None,
-                 interpolation_mode='neareset'):
+                 interpolation_mode='nearest'):
         super(MotionTransferGenerator, self).__init__()
 
         self.appearance_encoder = Encoder(block_expansion, in_features=num_channels, max_features=max_features,
@@ -42,7 +42,7 @@ class MotionTransferGenerator(nn.Module):
         self.refinement_module = torch.nn.Sequential()
         for i in range(num_refinement_blocks):
             self.refinement_module.add_module(
-                'r' + str(i), ResBlock3D(in_features, kernel_sizes=(1, 3, 3), padding=(0, 1, 1)))
+                'r' + str(i), ResBlock3D(in_features, kernel_size=(1, 3, 3), padding=(0, 1, 1)))
         self.refinement_module.add_module(
             'conv-last', nn.Conv3d(in_channels=in_features, out_channels=num_channels, kernel_size=1, padding=0))
         self.interpolation_mode = interpolation_mode
@@ -51,9 +51,10 @@ class MotionTransferGenerator(nn.Module):
         bs, d, h_old, w_old, _ = deformations_absolute.shape
         _, _, _, h, w = inp.shape
         deformations_absolute = deformations_absolute.permute(0, 4, 1, 2, 3)
-        deformation = F.interpolate(deformations_absolute, size=(d, h, w), mode=self.interpolation_mode)
+        deformation = F.interpolate(
+            deformations_absolute, size=(d, h, w), mode=self.interpolation_mode, recompute_scale_factor=False)
         deformation = deformation.permute(0, 2, 3, 4, 1)
-        deformed_inp = F.grid_sample(inp, deformation)
+        deformed_inp = F.grid_sample(inp, deformation, align_corners=True)
         return deformed_inp
 
     def forward(self, source_image, kp_driving, kp_source):
@@ -68,7 +69,7 @@ class MotionTransferGenerator(nn.Module):
             d = kp_driving['mean'].shape[1]
             movement_embedding = self.kp_embedding_module(
                 source_image=source_image, kp_driving=kp_driving, kp_source=kp_source)
-            kp_skips = [F.interpolate(movement_embedding, size=(d,) + skip.shape[3:], mode=self.interpolation_mode)
+            kp_skips = [F.interpolate(movement_embedding, size=(d,) + skip.shape[3:], mode=self.interpolation_mode, recompute_scale_factor=False)
                         for skip in appearance_skips]
             skips = [torch.cat([a, b], dim=1) for a, b in zip(deformed_skips, kp_skips)]
         else:
