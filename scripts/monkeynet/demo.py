@@ -17,16 +17,17 @@ from library.utils.process import transfer_one
 from library.dataset.frames_dataset import read_video
 from library.dataset.augmentation import VideoToTensor
 from library.sync_batchnorm import DataParallelWithCallback
+from library.utils.files import get_name
 
 
 if __name__ == "__main__":
     parser = ArgumentParser()
     # parser.add_argument("--config", required=True, help="path to config")
-    parser.add_argument("--config", default='config/monkeynet/moving-gif.yaml', help="path to config")
+    parser.add_argument("--config", default='config/monkeynet/nemo.yaml', help="path to config")
     # parser.add_argument("--checkpoint", required=True, help="path to checkpoint")
-    parser.add_argument("--checkpoint", default='checkpoints/monkeynet/moving-gif-ckp.pth.tar', help="path to checkpoint")
-    parser.add_argument("--source_image", default="sup-mat/source.png", help="path to source image")
-    parser.add_argument("--driving_video", default="sup-mat/driving.png", help="path to driving video")
+    parser.add_argument("--checkpoint", default='checkpoints/monkeynet/nemo-ckp.pth.tar', help="path to checkpoint")
+    parser.add_argument("--source_image", default="sup-mat/nemo-source.png", help="path to source image")
+    parser.add_argument("--driving_video", default="sup-mat/nemo-driving.png", help="path to driving video")
     parser.add_argument("--out_file", default="demo.gif", help="path to out file")
     parser.add_argument("--cpu", dest="cpu", action="store_true", help="use cpu")
     opt = parser.parse_args()
@@ -64,4 +65,5 @@ if __name__ == "__main__":
         out = transfer_one(kp_detector, generator, source_image, driving_video, config['transfer_params'])
         out_video_batch = out['video_prediction'].data.cpu().numpy()
         out_video_batch = np.transpose(out_video_batch, [0, 2, 3, 4, 1])[0]
-        imageio.mimsave(opt.out_file, (255 * out_video_batch).astype(np.uint8))
+        imageio.mimsave(
+            get_name(opt.config) + '_' + opt.out_file, (255 * out_video_batch).astype(np.uint8))

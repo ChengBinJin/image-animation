@@ -94,14 +94,14 @@ def normalize_kp(kp_video, kp_appearance, movement_mult=False, move_location=Fal
         kp_video_diff *= movement_mult
         kp_video['mean'] = kp_video_diff + kp_appearance['mean']
 
-    if clip_mean:
+    if move_location and clip_mean:
         one = torch.ones(1).type(kp_video_diff.type())
         kp_video['mean'] = torch.max(kp_video['mean'], -one)
         kp_video['mean'] = torch.min(kp_video['mean'], one)
 
     if ('var' in kp_video) and adapt_variance:
         var_first = kp_video['var'][:, 0:1].repeat(1, kp_video['var'].shape[1], 1, 1, 1)
-        kp_var, _ = torch.gesv(var_first, kp_video['var'])
+        kp_var, _ = torch.solve(var_first, kp_video['var'])
 
         kp_var = torch.matmul(kp_video['var'], matrix_inverse(kp_video['var'][:, 0:1], eps=0))
         kp_var = torch.matmul(kp_var, kp_appearance['var'])
