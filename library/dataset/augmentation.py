@@ -6,5 +6,5 @@ class VideoToTensor(object):
 
     def __call__(self, driving):
         driving = np.array(driving, dtype='float32')
-        out = {'video': driving.transpose((3, 0, 1, 2))}  # (N, C, H, W)
+        out = {'video': driving.transpose((3, 0, 1, 2))}  # (C, N, H, W)
         return out

@@ -15,10 +15,10 @@ def read_video(name, image_shape):
         if image.shape[2] == 4:
             image = image[..., :3]
 
-        image = img_as_float32(image)
-        video_array = np.moveaxis(image, 1, 0)
-        video_array = video_array.reshape((-1,) + image_shape)
-        video_array = np.moveaxis(video_array, 1, 2)
+        image = img_as_float32(image)   # (H, N*W, 3)
+        video_array = np.moveaxis(image, 1, 0)  # (N*W, H, 3)
+        video_array = video_array.reshape((-1,) + image_shape)  # (N, W, H, 3)
+        video_array = np.moveaxis(video_array, 1, 2)  # (N, H, W, 3)
     elif name.lower().endswith('.gif') or name.lower().endswith('.mp4') or name.lower().endswith('.mov'):
         video = np.array(mimread(name, memtest=False))
 
