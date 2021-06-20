@@ -61,13 +61,13 @@ if __name__ == "__main__":
 
         driving_video = torch.from_numpy(driving_video).unsqueeze(0)    # (1, C, N, H, W)
         source_image = torch.from_numpy(source_image).unsqueeze(0)      # (1, C, 1, H, W)
-
+        out = transfer_one(kp_detector, generator, source_image, driving_video, config['transfer_params'])
         # video_prediciton: (1, C, N, H, W)
         # video_deformed:   (1, C, N, H, W)
         # kp_driving:   - mean: (1, N, num_kp, 2); - var: (1, N, num_kp, 2, 2)
         # kp_source:    - mean: (1, 1, num_kp, 2); - var: (1, 1, num_kp, 2, 2)
         # kp_norm:      - mean: (1, N, num_kp, 2); - var: (1, N, num_kp, 2, 2)
-        out = transfer_one(kp_detector, generator, source_image, driving_video, config['transfer_params'])
+
         out_video_batch = out['video_prediction'].data.cpu().numpy()  # (1, C, N, H, W)
         out_video_batch = np.transpose(out_video_batch, [0, 2, 3, 4, 1])[0]  # (1, N, H, W, C) -> (N, H, W, C)
         imageio.mimsave(
