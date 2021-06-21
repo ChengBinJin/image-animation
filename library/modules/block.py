@@ -82,7 +82,8 @@ class Hourglass(nn.Module):
         self.decoder = Decoder(block_expansion, in_features, out_features, num_blocks, max_features, temporal=temporal)
 
     def forward(self, x):
-        return self.decoder(self.encoder(x))
+        out = self.decoder(self.encoder(x))  # (N, num_kp, 1, H, W)
+        return out
 
 
 class DownBlock3D(nn.Module):
