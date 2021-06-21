@@ -58,26 +58,33 @@ class MotionTransferGenerator(nn.Module):
         return deformed_inp
 
     def forward(self, source_image, kp_driving, kp_source):
+        # source_image: (1, 3, 1, H, W)
+        # kp_driving    - mean: (1, 1, num_kp, 2)
+        #               - var:  (1, 1, num_kp, 2, 2)
+        # kp_source:    - mean: (1, 1, num_kp, 2)
+        #               - var:  (1, 1, num_kp, 2, 2)
         appearance_skips = self.appearance_encoder(source_image)
 
         deformations_absolute = self.dense_motion_module(
             source_image=source_image, kp_driving=kp_driving, kp_source=kp_source)
+        # deformations_absolute:    (1, 1, H, W, 3)
 
         deformed_skips = [self.deform_input(skip, deformations_absolute) for skip in appearance_skips]
 
         if self.kp_embedding_module is not None:
-            d = kp_driving['mean'].shape[1]
+            d = kp_driving['mean'].shape[1]  # d = 1
             movement_embedding = self.kp_embedding_module(
-                source_image=source_image, kp_driving=kp_driving, kp_source=kp_source)
-            kp_skips = [F.interpolate(movement_embedding, size=(d,) + skip.shape[3:], mode=self.interpolation_mode, recompute_scale_factor=False)
-                        for skip in appearance_skips]
+                source_image=source_image, kp_driving=kp_driving, kp_source=kp_source)  # (1, num_kp, 1, H, W)
+            kp_skips = [F.interpolate(
+                movement_embedding, size=(d,) + skip.shape[3:], mode=self.interpolation_mode,
+                recompute_scale_factor=False) for skip in appearance_skips]
             skips = [torch.cat([a, b], dim=1) for a, b in zip(deformed_skips, kp_skips)]
         else:
             skips = deformed_skips
 
-        video_deformed = self.deform_input(source_image, deformations_absolute)
-        video_prediction = self.video_decoder(skips)
-        video_prediction = self.refinement_module(video_prediction)
+        video_deformed = self.deform_input(source_image, deformations_absolute)  # (1, 3, 1, H, W)
+        video_prediction = self.video_decoder(skips)  # (1, 3, 1, H, W)
+        video_prediction = self.refinement_module(video_prediction)  # (1, 3, 1, H, W)
         video_prediction = torch.sigmoid(video_prediction)
 
         return {"video_prediction": video_prediction, "video_deformed": video_deformed}
