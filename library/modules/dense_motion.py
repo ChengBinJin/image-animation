@@ -146,39 +146,44 @@ class DenseMotionModule(nn.Module):
         self.scale_factor = scale_factor
 
     def forward(self, source_image, kp_driving, kp_source):
+        # source_image: (N, 3, 1, H, W)
+        # kp_driving    - mean: (N, 1, num_kp, 2)
+        #               - var:  (N, 1, num_kp, 2, 2)
+        # kp_source     - mean: (N, 1, num_kp, 2)
+        #               - var:  (N, 1, num_kp, 2, 2)
         if self.scale_factor != 1:
             source_image = F.interpolate(source_image, scale_factor=(1, self.scale_factor, self.scale_factor), recompute_scale_factor=True)
 
-        prediction = self.mask_embedding(source_image, kp_driving, kp_source)  # (N, 11*(1+2+9), 3, H/2, W/2)
+        prediction = self.mask_embedding(source_image, kp_driving, kp_source)  # (N, 44, 1, H, W)
         for block in self.group_blocks:
             prediction = block(prediction)
             prediction = F.leaky_relu(prediction, 0.2)
-        prediction = self.hourglass(prediction)
+        prediction = self.hourglass(prediction)  # (N, 13, 1, 64, 64)
 
         bs, _, d, h, w = prediction.shape
         if self.use_mask:
-            mask = prediction[:, :(self.num_kp + 1)]
+            mask = prediction[:, :(self.num_kp + 1)]  # (N, num_kp+1, 1, H, W)
             mask = F.softmax(mask, dim=1)
             mask = mask.unsqueeze(2)
-            difference_embedding = self.difference_embedding(source_image, kp_driving, kp_source)
-            difference_embedding = difference_embedding.view(bs, self.num_kp + 1, 2, d, h, w)
-            deformations_relative = (difference_embedding * mask).sum(dim=1)
+            difference_embedding = self.difference_embedding(source_image, kp_driving, kp_source)  # (N, (num_kp+1)*2, H, W)
+            difference_embedding = difference_embedding.view(bs, self.num_kp + 1, 2, d, h, w)   # (N, num_kp+1, 2, 1, H, W)
+            deformations_relative = (difference_embedding * mask).sum(dim=1)  # (N, 2, 1, H, W)
         else:
             deformations_relative = 0
 
         if self.use_correction:
-            correction = prediction[:, -2:]
+            correction = prediction[:, -2:]  # (N, 2, 1, H, W)
         else:
             correction = 0
 
-        deformations_relative = deformations_relative + correction
-        deformations_relative = deformations_relative.permute(0, 2, 3, 4, 1)
+        deformations_relative = deformations_relative + correction  # (N, 2, 1, H, W)
+        deformations_relative = deformations_relative.permute(0, 2, 3, 4, 1)  # (N, 1, H, W, 2)
 
-        coordinate_grid = make_coordinate_grid((h, w), dtype=deformations_relative.type())
-        coordinate_grid = coordinate_grid.view(1, 1, h, w, 2)
-        deformation = deformations_relative + coordinate_grid
-        z_coordinate = torch.zeros(deformation.shape[:-1] + (1,)).type(deformation.type())
-        out = torch.cat([deformation, z_coordinate], dim=-1)
+        coordinate_grid = make_coordinate_grid((h, w), dtype=deformations_relative.type())  # (H, W, 2)
+        coordinate_grid = coordinate_grid.view(1, 1, h, w, 2)  # (1, 1, H, W, 2)
+        deformation = deformations_relative + coordinate_grid  # (N, 1, H, W, 2)
+        z_coordinate = torch.zeros(deformation.shape[:-1] + (1,)).type(deformation.type())  # (N, 1, H, W, 1)
+        out = torch.cat([deformation, z_coordinate], dim=-1)  # (N, 1, H, W, 3)
 
         return out
 
