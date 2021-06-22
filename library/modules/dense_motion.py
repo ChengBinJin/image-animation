@@ -32,76 +32,85 @@ class MovementEmbeddingModule(nn.Module):
         self.scale_factor = scale_factor
 
     def normalize_heatmap(self, heatmap):
+        # heatmap   (N, 1, num_kp, H, W)
         if self.norm_const == "sum":
-            heatmap_shape = heatmap.shape   # (1, 3, kp, H/2, W/2)
-            heatmap = heatmap.view(heatmap_shape[0], heatmap_shape[1], heatmap_shape[2], -1)    # (1, 3, kp, H/2*W/2)
+            heatmap_shape = heatmap.shape
+            heatmap = heatmap.view(heatmap_shape[0], heatmap_shape[1], heatmap_shape[2], -1)
             heatmap = heatmap / heatmap.sum(dim=3, keepdim=True)
-            out = heatmap.view(*heatmap_shape)  # (1, 3, kp, H/2, W/2)
+            out = heatmap.view(*heatmap_shape)
         else:
-            out = heatmap / self.norm_const     # (1, 3, kp, H/2, W/2)
+            out = heatmap / self.norm_const     # (N, 1, num_kp, H, W)
 
         return out
 
     def forward(self, source_image, kp_driving, kp_source):
+        # source_image:         (N, 3, 1, H, W)
+        # kp_driving    - mean: (N, 1, num_kp, 2)
+        #               - var:  (N, 1, num_kp, 2, 2)
+        # kp_source     - mean: (N, 1, num_kp, 2)
+        #               - var:  (N, 1, num_kp, 2, 2)
         if self.scale_factor != 1:
             source_image = F.interpolate(
                 source_image, scale_factor=(1, self.scale_factor, self.scale_factor), recompute_scale_factor=True)
 
-        spatial_size = source_image.shape[3:]       # (H/2, W/2)
+        spatial_size = source_image.shape[3:]       # (H, W)
 
-        bs, _, _, h, w = source_image.shape         # (N, 3, 3, H/2, W/2)
-        _, d, num_kp, _ = kp_driving['mean'].shape  # (N, 3, kp, 2)
+        bs, _, _, h, w = source_image.shape         # (N, 3, 1, H, W)
+        _, d, num_kp, _ = kp_driving['mean'].shape  # (N, 1, num_kp, 2)
 
         inputs = []
         if self.use_heatmap:
             heatmap = self.normalize_heatmap(
-                kp2gaussian(kp_driving, spatial_size=spatial_size, kp_variance=self.kp_variance))  # (1, 3, kp, H/2, W/2)
+                kp2gaussian(kp_driving, spatial_size=spatial_size, kp_variance=self.kp_variance))
+            # heatmap: (N, 1, num_kp, H, W)
 
             if self.heatmap_type == 'difference':
                 heatmap_appearance = self.normalize_heatmap(
                     kp2gaussian(kp_source, spatial_size=spatial_size, kp_variance=self.kp_variance))
-                heatmap = heatmap - heatmap_appearance
+                # heatmap_appearance:   (N, 1, num_kp, H, W)
+                heatmap = heatmap - heatmap_appearance  # (N, 1, num_kp, H, W)
 
             if self.add_bg_feature_map:
-                zeros = torch.zeros(bs, d, 1, h, w).type(heatmap.type())  # (N, 3, 1, H/2, W/2)
-                heatmap = torch.cat([zeros, heatmap], dim=2)  # (N, 3, kp+1, H/2, W/2)
+                zeros = torch.zeros(bs, d, 1, h, w).type(heatmap.type())  # (N, 1, 1, H, W)
+                heatmap = torch.cat([zeros, heatmap], dim=2)  # (N, 1, num_kp+1, H, W)
 
-            heatmap = heatmap.unsqueeze(3)  # (N, 3, kp+1, 1, H/2, W/2)
+            heatmap = heatmap.unsqueeze(3)  # (N, 1, num_kp+1, 1, H, W)
             inputs.append(heatmap)
 
-        num_kp += self.add_bg_feature_map
+        num_kp += self.add_bg_feature_map   # 11
         kp_video_diff = None
         if self.use_difference or self.use_deformed_source_image:
-            kp_video_diff = kp_source['mean'] - kp_driving['mean']              # (N, 3, kp, 2)
+            kp_video_diff = kp_source['mean'] - kp_driving['mean']              # (N, 1, num_kp, 2)
 
             if self.add_bg_feature_map:
-                zeros = torch.zeros(bs, d, 1, 2).type(kp_video_diff.type())     # (N, 3, 1, 2)
-                kp_video_diff = torch.cat([zeros, kp_video_diff], dim=2)       # (N, 3, kp+1, 2)
+                zeros = torch.zeros(bs, d, 1, 2).type(kp_video_diff.type())     # (N, 1, 1, 2)
+                kp_video_diff = torch.cat([zeros, kp_video_diff], dim=2)       # (N, 1, num_kp+1, 2)
             kp_video_diff = kp_video_diff.view((bs, d, num_kp, 2, 1, 1)).repeat(1, 1, 1, 1, h, w)
-            # (N, 3, kp+1, 2, H/2, W/2)
+            # kp_video_diff:     (N, 1, num_kp+1, 2, H, W)
 
         if self.use_difference:
             inputs.append(kp_video_diff)
 
         if self.use_deformed_source_image:
             appearance_repeat = source_image.unsqueeze(1).unsqueeze(1).repeat(1, d, num_kp, 1, 1, 1, 1)
-            # (N, 3, kp+1, 3, 3, H/2, W/2)
-            appearance_repeat = appearance_repeat.view(bs * d * num_kp, -1, h, w)  # (N*3*(kp+1), 3*3, H/2, W/2)
+            # (N, 1, num_kp+1, 3, 1, H, W)
+            appearance_repeat = appearance_repeat.view(bs * d * num_kp, -1, h, w)  # (N*1*(kp+1), 3*1, H, W)
 
             deformation_approx = kp_video_diff.view((bs * d * num_kp, -1, h, w)).permute(0, 2, 3, 1)
-            # (N * 3 * (kp+1), H/2, W/2, 2)
-            coordinate_grid = make_coordinate_grid((h, w), dtype=deformation_approx.type())  # (H/2, W/2, 2)
-            coordinate_grid = coordinate_grid.view(1, h, w, 2)  # (1, H/2, W/2, 2)
-            deformation_approx = coordinate_grid + deformation_approx  # (N * 3 * (kp+1), H/2, W/2, 2)
+            # (N * 1 * (num_kp+1), H, W, 2)
+            coordinate_grid = make_coordinate_grid((h, w), dtype=deformation_approx.type())  # (H, W, 2)
+            coordinate_grid = coordinate_grid.view(1, h, w, 2)  # (1, H, W, 2)
+            deformation_approx = coordinate_grid + deformation_approx  # (N * 1 * (kp+1), H, W, 2)
 
             appearance_approx_deform = F.grid_sample(appearance_repeat, deformation_approx, align_corners=True)
+            # appearance_approx_deform: (num_kp+1, 3, H, W)
             appearance_approx_deform = appearance_approx_deform.view((bs, d, num_kp, -1, h, w))
-            # (N, 3, (kp+1), 3*3, H/2, W/2)
+            # (N, 1, (num_kp+1), 3*1, H, W)
             inputs.append(appearance_approx_deform)
 
-        movement_encoding = torch.cat(inputs, dim=3)  # (N, 3, 11, 1+2+9, H/2, W/2)
-        movement_encoding = movement_encoding.view(bs, d, -1, h, w)     # (N, 3, 11*(1+2+9), H/2, W/2)
-        movement_encoding = movement_encoding.permute(0, 2, 1, 3, 4)    # (N, 11*(1+2+9), 3, H/2, W/2)
+        movement_encoding = torch.cat(inputs, dim=3)  # (N, 1, num_kp+1, 1+3, H, W)
+        movement_encoding = movement_encoding.view(bs, d, -1, h, w)     # (N, 1, 11*(1+3), H, W)
+        movement_encoding = movement_encoding.permute(0, 2, 1, 3, 4)    # (N, 11*(1+3), 1, H, W)
 
         return movement_encoding
 
@@ -152,12 +161,15 @@ class DenseMotionModule(nn.Module):
         # kp_source     - mean: (N, 1, num_kp, 2)
         #               - var:  (N, 1, num_kp, 2, 2)
         if self.scale_factor != 1:
-            source_image = F.interpolate(source_image, scale_factor=(1, self.scale_factor, self.scale_factor), recompute_scale_factor=True)
+            source_image = F.interpolate(
+                source_image, scale_factor=(1, self.scale_factor, self.scale_factor), recompute_scale_factor=True)
 
-        prediction = self.mask_embedding(source_image, kp_driving, kp_source)  # (N, 44, 1, H, W)
+        prediction = self.mask_embedding(source_image, kp_driving, kp_source)
+        # prediction:   (N, (num_kp+1)*(1+3), 1, H, W)
         for block in self.group_blocks:
             prediction = block(prediction)
             prediction = F.leaky_relu(prediction, 0.2)
+        # prediction:   ()
         prediction = self.hourglass(prediction)  # (N, 13, 1, 64, 64)
 
         bs, _, d, h, w = prediction.shape

@@ -11,29 +11,32 @@ def kp2gaussian(kp, spatial_size, kp_variance='matrix'):
     """
     Transform a keypoint into gaussian like representation
     """
-    mean = kp['mean']                                                       # (1, 3, kp, 2)
-    coordinate_grid = make_coordinate_grid(spatial_size, mean.type())       # (H/2, W/2, 2)
+    # kp    - mean: (N, 1, num_kp, 2)
+    #       - var:  (N, 1, num_kp, 2, 2)
+    # spatial_size = (H, W)
+    mean = kp['mean']                                                       # (N, 1, num_kp, 2)
+    coordinate_grid = make_coordinate_grid(spatial_size, mean.type())       # (H, W, 2)
 
     number_of_leading_dimensions = len(mean.shape) - 1                      # 3
-    shape = (1,) * number_of_leading_dimensions + coordinate_grid.shape     # (1, 1, 1, H/2, W/2, 2)
+    shape = (1,) * number_of_leading_dimensions + coordinate_grid.shape     # (1, 1, 1, H, W, 2)
 
-    coordinate_grid = coordinate_grid.view(*shape)                          # (1, 1, 1, H/2, W/2, 2)
-    repeats = mean.shape[:number_of_leading_dimensions] + (1, 1, 1)         # (1, 3, kp, 1, 1, 1)
-    coordinate_grid = coordinate_grid.repeat(*repeats)                      # (1, 3, kp, H/2, W/2, 2)
+    coordinate_grid = coordinate_grid.view(*shape)                          # (1, 1, 1, H, W, 2)
+    repeats = mean.shape[:number_of_leading_dimensions] + (1, 1, 1)         # (N, 1, num_kp, 1, 1, 1)
+    coordinate_grid = coordinate_grid.repeat(*repeats)                      # (N, 1, num_kp, H, W, 2)
 
     # Preprocess kp shape
-    shape = mean.shape[:number_of_leading_dimensions] + (1, 1, 2)           # (1, 3, kp, 1, 1, 2)
-    mean = mean.view(*shape)                                                # (1, 3, kp, 1, 1, 2)
+    shape = mean.shape[:number_of_leading_dimensions] + (1, 1, 2)           # (N, 1, num_kp, 1, 1, 2)
+    mean = mean.view(*shape)                                                # (N 1, num_kp, 1, 1, 2)
 
-    mean_sub = (coordinate_grid - mean)                                     # (1, 3, kp, H/2, W/2, 2)
+    mean_sub = (coordinate_grid - mean)                                     # (N, 1, num_kp, H, W, 2)
     if kp_variance == 'matrix':
-        var = kp['var']                                                     # (1, 3, kp, 2, 2)
-        inv_var = matrix_inverse(var)                                       # (1, 3, kp, 2, 2)
-        shape = inv_var.shape[:number_of_leading_dimensions] + (1, 1, 2, 2)  # (1, 3, 10, 1, 1, 2, 2)
-        inv_var = inv_var.view(*shape)                                      # (1, 3, kp, 1, 1, 2, 2)
-        under_exp = torch.matmul(torch.matmul(mean_sub.unsqueeze(-2), inv_var), mean_sub.unsqueeze(-1))     # (1, 3, kp, H/2, W/2, 1, 1)
-        under_exp = under_exp.squeeze(-1).squeeze(-1)                       # (1, 3, kp, H/2, W/2)
-        out = torch.exp(-0.5 * under_exp)                                   # (1, 3, kp, H/2, W/2)
+        var = kp['var']                                                     # (N, 1, num_kp, 2, 2)
+        inv_var = matrix_inverse(var)                                       # (N, 1, num_kp, 2, 2)
+        shape = inv_var.shape[:number_of_leading_dimensions] + (1, 1, 2, 2)  # (N, 1, num_kp, 1, 1, 2, 2)
+        inv_var = inv_var.view(*shape)                                      # (N, 1, num_kp, 1, 1, 2, 2)
+        under_exp = torch.matmul(torch.matmul(mean_sub.unsqueeze(-2), inv_var), mean_sub.unsqueeze(-1))     # (N, 1, num_kp, H, W, 1, 1)
+        under_exp = under_exp.squeeze(-1).squeeze(-1)                       # (N, 1, num_kp, H, W)
+        out = torch.exp(-0.5 * under_exp)                                   # (N, 1, num_kp, H, W)
     elif kp_variance == 'single':
         out = torch.exp(-0.5 * (mean_sub ** 2).sum(-1) / kp['var'])
     else:
