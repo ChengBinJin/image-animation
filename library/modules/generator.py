@@ -22,6 +22,7 @@ class MotionTransferGenerator(nn.Module):
         if kp_embedding_params is not None:
             self.kp_embedding_module = MovementEmbeddingModule(
                 num_kp=num_kp, kp_variance=kp_variance, num_channels=num_channels, **kp_embedding_params)
+            #
             embedding_features = self.kp_embedding_module.out_channels
         else:
             self.kp_embedding_module = None
@@ -48,13 +49,15 @@ class MotionTransferGenerator(nn.Module):
         self.interpolation_mode = interpolation_mode
 
     def deform_input(self, inp, deformations_absolute):
+        # inpu:                     (N, C, 1, H, W)
+        # deformation_absolute:     (N, 1, H, W, 3)
         bs, d, h_old, w_old, _ = deformations_absolute.shape
         _, _, _, h, w = inp.shape
-        deformations_absolute = deformations_absolute.permute(0, 4, 1, 2, 3)
+        deformations_absolute = deformations_absolute.permute(0, 4, 1, 2, 3)  # (N, 3, 1, H, W)
         deformation = F.interpolate(
             deformations_absolute, size=(d, h, w), mode=self.interpolation_mode, recompute_scale_factor=False)
-        deformation = deformation.permute(0, 2, 3, 4, 1)
-        deformed_inp = F.grid_sample(inp, deformation, align_corners=True)
+        deformation = deformation.permute(0, 2, 3, 4, 1)  # (N, 1, H, W, 3)
+        deformed_inp = F.grid_sample(inp, deformation, align_corners=True)  # (N, C, 1, H, W)
         return deformed_inp
 
     def forward(self, source_image, kp_driving, kp_source):
@@ -82,9 +85,9 @@ class MotionTransferGenerator(nn.Module):
         else:
             skips = deformed_skips
 
-        video_deformed = self.deform_input(source_image, deformations_absolute)  # (1, 3, 1, H, W)
-        video_prediction = self.video_decoder(skips)  # (1, 3, 1, H, W)
-        video_prediction = self.refinement_module(video_prediction)  # (1, 3, 1, H, W)
-        video_prediction = torch.sigmoid(video_prediction)
+        video_deformed = self.deform_input(source_image, deformations_absolute)  # (N, 3, 1, H, W)
+        video_prediction = self.video_decoder(skips)  # (N, 3, 1, H, W)
+        video_prediction = self.refinement_module(video_prediction)  # (N, 3, 1, H, W)
+        video_prediction = torch.sigmoid(video_prediction)  # (N, 3, 1, H, W)
 
         return {"video_prediction": video_prediction, "video_deformed": video_deformed}

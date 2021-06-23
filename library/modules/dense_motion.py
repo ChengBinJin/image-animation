@@ -169,15 +169,15 @@ class DenseMotionModule(nn.Module):
         for block in self.group_blocks:
             prediction = block(prediction)
             prediction = F.leaky_relu(prediction, 0.2)
-        # prediction:   ()
-        prediction = self.hourglass(prediction)  # (N, 13, 1, 64, 64)
+        # prediction:   (N, (num_kp+1)*(1+3), 1, H, W)
+        prediction = self.hourglass(prediction)  # (N, (num_kp+1)+2, 1, H, W)
 
-        bs, _, d, h, w = prediction.shape
+        bs, _, d, h, w = prediction.shape  # bs=N, d=1
         if self.use_mask:
             mask = prediction[:, :(self.num_kp + 1)]  # (N, num_kp+1, 1, H, W)
-            mask = F.softmax(mask, dim=1)
-            mask = mask.unsqueeze(2)
-            difference_embedding = self.difference_embedding(source_image, kp_driving, kp_source)  # (N, (num_kp+1)*2, H, W)
+            mask = F.softmax(mask, dim=1)   # (N, num_kp+1, 1, H, W)
+            mask = mask.unsqueeze(2)    # (N, num_kp, 1, 1, H, W)
+            difference_embedding = self.difference_embedding(source_image, kp_driving, kp_source)  # (N, (num_kp+1)*2, 1, H, W)
             difference_embedding = difference_embedding.view(bs, self.num_kp + 1, 2, d, h, w)   # (N, num_kp+1, 2, 1, H, W)
             deformations_relative = (difference_embedding * mask).sum(dim=1)  # (N, 2, 1, H, W)
         else:
