@@ -22,10 +22,8 @@ from library.utils.files import get_name
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    # parser.add_argument("--config", required=True, help="path to config")
-    parser.add_argument("--config", default='../../config/monkeynet/nemo.yaml', help="path to config")
-    # parser.add_argument("--checkpoint", required=True, help="path to checkpoint")
-    parser.add_argument("--checkpoint", default='../../checkpoints/monkeynet/nemo-ckp.pth.tar', help="path to checkpoint")
+    parser.add_argument("--config", required=True, help="path to config")
+    parser.add_argument("--checkpoint", required=True, help="path to checkpoint")
     parser.add_argument("--source_image", default="../../sup-mat/nemo-source.png", help="path to source image")
     parser.add_argument("--driving_video", default="../../sup-mat/nemo-driving.png", help="path to driving video")
     parser.add_argument("--out_file", default="demo.gif", help="path to out file")
