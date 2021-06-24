@@ -28,7 +28,12 @@ def all_files_under(path, extension=None, append_path=True, sort=True):
 
 
 def get_name_and_ext(path):
-    name, ext = os.path.splitext(os.path.basename(path))
+    base_name = os.path.basename(path)
+    name, ext = os.path.splitext(base_name)
+
+    while '.' in name:
+        name, _ = os.path.splitext(name)
+
     return name, ext
 
 
