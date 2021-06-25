@@ -43,6 +43,4 @@ if __name__ == "__main__":
     if not os.path.exists(os.path.join(log_dir, os.path.basename(opt.config))):
         copy(opt.config, log_dir)
 
-    generator = Motion
-
     print("SUCCESS")

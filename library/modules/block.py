@@ -20,8 +20,8 @@ class Encoder(nn.Module):
         for i in range(num_blocks):
             down_blocks.append(
                 DownBlock3DGen(in_features=in_features if i == 0 else min(max_features, block_expansion * (2**i)),
-                            out_features=min(max_features, block_expansion * (2 ** (i+1))),
-                            kernel_size=kernel_size, padding=padding))
+                               out_features=min(max_features, block_expansion * (2 ** (i+1))),
+                               kernel_size=kernel_size, padding=padding))
         self.down_blocks = nn.ModuleList(down_blocks)
 
     def forward(self, x):
@@ -96,12 +96,13 @@ class DownBlock3DGen(nn.Module):
         self.conv = nn.Conv3d(
             in_channels=in_features, out_channels=out_features, kernel_size=kernel_size, padding=padding)
         self.norm = BatchNorm3d(out_features, affine=True)
+        self.activate = nn.ReLU()
         self.pool = nn.AvgPool3d(kernel_size=(1, 2, 2))
 
     def forward(self, x):
         out = self.conv(x)
         out = self.norm(out)
-        out = F.relu(out)
+        out = self.activate(out)
         out = self.pool(out)
         return out
 
@@ -115,18 +116,18 @@ class DownBlock3DDis(nn.Module):
         super(DownBlock3DDis, self).__init__()
         self.conv = nn.Conv3d(
             in_channels=in_features, out_channels=out_features, kernel_size=(1, kernel_size, kernel_size))
-
         if norm:
             self.norm = nn.InstanceNorm3d(out_features, affine=True)
         else:
             self.norm = None
-        self.pool = F.avg_pool3d(kernel_size=(1, 2, 2))
+        self.activate = nn.LeakyReLU(negative_slope=0.2)
+        self.pool = nn.AvgPool3d(kernel_size=(1, 2, 2))
 
     def forward(self, x):
         out = self.conv(x)
         if self.norm:
             out = self.norm(out)
-        out = F.leaky_relu(out, negative_slope=0.2)
+        out = F.leaky_relu(out)
         out = self.pool(out)
         return out
 
