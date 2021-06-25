@@ -4,12 +4,15 @@ import yaml
 
 from argparse import ArgumentParser
 from datetime import datetime
+from shutil import copy
 
 source_file_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 project_dir = os.path.split(source_file_dir)[0]
 sys.path.append(project_dir)
 
 from library.utils.files import get_name
+from library.modules.generator import MotionTransferGenerator
+from library.modules.discriminator import Discriminator
 
 
 if __name__ == "__main__":
@@ -34,4 +37,12 @@ if __name__ == "__main__":
     else:
         log_dir = os.path.join(project_dir, opt.log_dir,
                                get_name(opt.config) + datetime.now().strftime("_%Y-%m-%d_%H:%M:%S"))
-    print(f'log_dir: {log_dir}')
+
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    if not os.path.exists(os.path.join(log_dir, os.path.basename(opt.config))):
+        copy(opt.config, log_dir)
+
+    generator = Motion
+
+    print("SUCCESS")
