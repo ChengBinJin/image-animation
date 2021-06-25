@@ -1,5 +1,7 @@
 import sys
 import os
+
+import torch.cuda
 import yaml
 
 from argparse import ArgumentParser
@@ -23,7 +25,7 @@ if __name__ == "__main__":
     parser.add_argument("--mode", default="train", choices=["train", "reconstruction", "transfer", "prediction"])
     parser.add_argument("--log_dir", default="logs/monkeynet", help="path to log into")
     parser.add_argument("--checkpoint", default=None, help="path to checkpoint to restore")
-    parser.add_argument("--device_ids", default=0, type=lambda x: list(map(int, x.split(','))),
+    parser.add_argument("--device_ids", default="0", type=lambda x: list(map(int, x.split(','))),
                         help="Names of the devices comma separated")
     parser.add_argument("--verbose", dest="verbose", action="store_true", help="Print model architecture")
 
@@ -50,5 +52,15 @@ if __name__ == "__main__":
                                         **config['model_params']['common_params'])
     discriminator = Discriminator(**config['model_params']['discriminator_params'],
                                   **config['model_params']['common_params'])
+
+    if torch.cuda.is_available():
+        kp_detector.to(opt.device_ids[0])
+        generator.to(opt.device_ids[0])
+        discriminator.to(opt.device_ids[0])
+
+    if opt.verbose:
+        print(kp_detector, "\n")
+        print(generator, "\n")
+        print(discriminator, "\n")
 
     print("SUCCESS")
