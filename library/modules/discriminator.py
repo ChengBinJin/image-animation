@@ -4,6 +4,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from library.modules.dense_motion import MovementEmbeddingModule
+from library.modules.block import DownBlock3DDis
 
 
 class Discriminator(nn.Module):
@@ -26,9 +27,9 @@ class Discriminator(nn.Module):
         down_blocks = []
         for i in range(num_blocks):
             down_blocks.append(
-                DownBlock3D(
-                    num_channels + embedding_channels if i == 0 else min(max_features, block_expansion * (2 ** i)),
-                    min(max_features, block_expansion * (2 ** (i + 1))),
+                DownBlock3DDis(
+                    in_features=num_channels + embedding_channels if i == 0 else min(max_features, block_expansion * (2 ** i)),
+                    out_features=min(max_features, block_expansion * (2 ** (i + 1))),
                     norm=(i != 0),
                     kenerl_size=4))
 
