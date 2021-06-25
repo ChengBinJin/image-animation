@@ -19,7 +19,7 @@ from library.utils.files import get_name
 if __name__ == "__main__":
     parser = ArgumentParser()
     # parser.add_argument("--config", required=True, help="path to config")
-    parser.add_argument("--config", default='../../config/monkeynet/moving-gif.yaml', help="path to config")
+    parser.add_argument("--config", default='config/monkeynet/moving-gif.yaml', help="path to config")
     parser.add_argument("--mode", default="train", choices=["train", "reconstruction", "transfer", "prediction"])
     parser.add_argument("--log_dir", default="logs/monkeynet", help="path to log into")
     parser.add_argument("--checkpoint", default=None, help="path to checkpoint to restore")
@@ -50,5 +50,5 @@ if __name__ == "__main__":
                                         **config['model_params']['common_params'])
     discriminator = Discriminator(**config['model_params']['discriminator_params'],
                                   **config['model_params']['common_params'])
-    
+
     print("SUCCESS")

@@ -31,7 +31,7 @@ class Discriminator(nn.Module):
                     in_features=num_channels + embedding_channels if i == 0 else min(max_features, block_expansion * (2 ** i)),
                     out_features=min(max_features, block_expansion * (2 ** (i + 1))),
                     norm=(i != 0),
-                    kenerl_size=4))
+                    kernel_size=4))
 
         self.down_blocks = nn.ModuleList(down_blocks)
         self.conv = nn.Conv3d(self.down_blocks[-1].conv.out_channels, out_channels=1, kernel_size=1)
