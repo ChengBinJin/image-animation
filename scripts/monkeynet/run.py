@@ -10,9 +10,10 @@ source_file_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 project_dir = os.path.split(source_file_dir)[0]
 sys.path.append(project_dir)
 
-from library.utils.files import get_name
+from library.modules.keypoint_detector import KPDetector
 from library.modules.generator import MotionTransferGenerator
 from library.modules.discriminator import Discriminator
+from library.utils.files import get_name
 
 
 if __name__ == "__main__":
@@ -43,4 +44,11 @@ if __name__ == "__main__":
     if not os.path.exists(os.path.join(log_dir, os.path.basename(opt.config))):
         copy(opt.config, log_dir)
 
+    kp_detector = KPDetector(**config['model_params']['kp_detector_params'],
+                             **config['model_params']['common_params'])
+    generator = MotionTransferGenerator(**config['model_params']['generator_params'],
+                                        **config['model_params']['common_params'])
+    discriminator = Discriminator(**config['model_params']['discriminator_params'],
+                                  **config['model_params']['common_params'])
+    
     print("SUCCESS")

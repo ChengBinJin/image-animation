@@ -36,3 +36,25 @@ class Discriminator(nn.Module):
         self.down_blocks = nn.ModuleList(down_blocks)
         self.conv = nn.Conv3d(self.down_blocks[-1].conv.out_channels, out_channels=1, kernel_size=1)
         self.scale_factor = scale_factor
+
+    def forward(self, x, kp_driving, kp_source):
+        out_maps = [x]
+        if self.scale_factor != 1:
+            x = F.interpolate(x, kp_driving, kp_source)
+
+        if self.kp_embedding:
+            heatmap = self.kp_embedding(x, kp_driving, kp_source)
+            out = torch.cat([x, heatmap], dim=1)
+        else:
+            out = x
+
+        for down_block in self.down_blocks:
+            out_maps.append(down_block(out))
+            out = out_maps[-1]
+
+        out = self.conv(out)
+        out_maps.append(out)
+
+        return out_maps
+
+
