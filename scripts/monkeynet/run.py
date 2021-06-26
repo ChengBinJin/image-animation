@@ -16,6 +16,7 @@ from library.modules.keypoint_detector import KPDetector
 from library.modules.generator import MotionTransferGenerator
 from library.modules.discriminator import Discriminator
 from library.utils.files import get_name
+from library.dataset.frames_dataset import FramesDataset
 
 
 if __name__ == "__main__":
@@ -62,5 +63,7 @@ if __name__ == "__main__":
         print(kp_detector, "\n")
         print(generator, "\n")
         print(discriminator, "\n")
+
+    dataset = FramesDataset(is_train=(opt.mode == 'train'), **config['dataset_params'])
 
     print("SUCCESS")
