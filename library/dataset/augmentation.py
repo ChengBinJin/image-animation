@@ -3,7 +3,7 @@ import numbers
 import PIL
 import numpy as np
 
-from skimage.transform import rotate
+from skimage.transform import rotate, resize
 
 
 class VideoToTensor(object):
@@ -111,6 +111,8 @@ class RandomResize(object):
             img_h, img_w, _ = clip[0].shape
         elif isinstance(clip[0], PIL.Image.Image):
             img_w, img_h = clip[0].size
+        else:
+            raise TypeError(f'Expected numpy.ndarray or PIL.Image, but got list of {type(clip[0])}')
 
         new_w = int(img_w * scalling_factor)
         new_h = int(img_h * scalling_factor)
@@ -147,3 +149,51 @@ class AllAumgnetationTransform:
         for transform in self.transforms:
             clip = transform(clip)
         return clip
+
+
+def get_resize_sizes(img_h, img_w, size):
+    if img_w < img_h:
+        ow = size
+        oh = int(size * img_h / img_w)
+    else:
+        oh = size
+        ow = int(size * img_w / img_h)
+    return oh, ow
+
+
+def resize_clip(clip, size, interpolation='bilinear'):
+    if isinstance(clip[0], np.ndarray):
+        if isinstance(size, numbers.Number):
+            img_h, img_w, img_c = clip[0].shape
+
+            # Min spatial dim already matches minimal size
+            if min(img_h, img_w) == size:
+                return clip
+
+            new_h, new_w = get_resize_sizes(img_h, img_w, size)
+            size = (new_w, new_h)
+        else:
+            size = (size[1], size[0])
+
+        order = 1 if interpolation == 'bilinear' else 0
+        scaled = [resize(img, output_shape=size, order=order, preserve_range=True, mode='constant', anti_aliasing=True)
+                  for img in clip]
+    elif isinstance(clip[0], PIL.Image.Image):
+        if isinstance(size, numbers.Number):
+            img_w, img_h = clip[0].size
+
+            # Min spatial dim already matches minimal size
+            if min(img_h, img_w) == size:
+                return clip
+
+            new_h, new_w = get_resize_sizes(img_h, img_w, size)
+            size = (new_w, new_h)
+        else:
+            size = (size[1], size[0])
+
+        pil_inter = PIL.Image.NEAREST if interpolation == 'bilinear' else PIL.Image.BILINEAR
+        scaled = [img.resize(size, interpolation=pil_inter) for img in clip]
+    else:
+        raise TypeError(f'Expected numpy.ndarray or PIL.Image, but got list of {type(clip[0])}')
+
+    return scaled
