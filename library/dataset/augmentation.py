@@ -4,6 +4,7 @@ import PIL
 import numpy as np
 
 from skimage.transform import rotate, resize
+from skimage.util import pad
 
 
 class VideoToTensor(object):
@@ -122,6 +123,46 @@ class RandomResize(object):
         return resized
 
 
+class RandomCrop(object):
+    """
+    Extract random crop at the same location for a list of images
+    Args:
+    size (sequence or int): Desired output size for the crop in format (h, w)
+    """
+
+    def __init__(self, size):
+        if isinstance(size, numbers.Number):
+            size = (size, size)
+        self.size = size
+
+    def __call__(self, clip):
+        """
+        Args:
+        img (PIL.Image or numpy.ndarray): List of images to be cropped in format (h, w, c) in numpy.ndarray
+        Returns:
+        PIL.Image or numpy.ndarray: Cropped list of images
+        """
+
+        h, w = self.size
+        if isinstance(clip[0], np.ndarray):
+            img_h, img_w, img_c = clip[0].shape
+        elif isinstance(clip[0], PIL.Image.Image):
+            img_w, img_h = clip[0].size
+        else:
+            raise TypeError(f'Expected numpy.ndarray or PIL.Image, but got list of {type(clip[0])}')
+
+        clip = pad_clip(clip, h, w)
+        img_h, img_w = clip.shape[1:3]
+        ##############################################################
+        # Need to check
+        x1 = 0 if h == img_h else random.randint(0, img_w - w)
+        y1 = 0 if w == img_w else random.randint(0, img_h - h)
+        cropped = crop_clip(clip, y1, x1, h, w)
+        ##############################################################
+
+        return cropped
+
+
 class AllAumgnetationTransform:
     def __init__(self, resize_param=None, rotation_param=None, flip_param=None, crop_param=None, jitter_param=None):
         self.transforms = []
@@ -151,6 +192,15 @@ class AllAumgnetationTransform:
         return clip
 
 
+def pad_clip(clip, h, w):
+    img_h, img_w = clip[0].shape[:2]
+    pad_h = (0, 0) if h < img_h else ((h - img_h) // 2, (h - img_h + 1) // 2)
+    pad_w = (0, 0) if w < img_w else ((w - img_w) // 2, (w - img_w + 1) // 2)
+    clip = pad(clip, ((0, 0), pad_h, pad_w, (0, 0)), mode='edge')
+
+    return clip
+
+
 def get_resize_sizes(img_h, img_w, size):
     if img_w < img_h:
         ow = size
@@ -158,6 +208,7 @@ def get_resize_sizes(img_h, img_w, size):
     else:
         oh = size
         ow = int(size * img_w / img_h)
+
     return oh, ow
 
 
