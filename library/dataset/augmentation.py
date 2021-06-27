@@ -1,6 +1,9 @@
 import random
-
+import numbers
+import PIL
 import numpy as np
+
+from skimage.transform import rotate
 
 
 class VideoToTensor(object):
@@ -50,6 +53,73 @@ class RandomFlip(object):
         return clip
 
 
+class RandomRotation(object):
+    """
+    Rotate entire clip randomly by a random angle within given bounds
+    Args:
+    degrees (sequence or int): Range of degrees to select from if degrees is a number instead of sequence like
+    (min, max), the range of degrees, will be (-degree, +degree)
+    """
+
+    def __init__(self, degrees):
+        if isinstance(degrees, numbers.Number):
+            if degrees < 0:
+                raise ValueError('If degrees is a single number, must be positive')
+            degrees = (-1*degrees, degrees)
+        else:
+            if len(degrees) != 2:
+                raise ValueError('If degrees is a sequence, it must be of len 2.')
+
+        self.degrees = degrees
+
+    def __call__(self, clip):
+        """
+        Args:
+        img (PIL.Image or numpy.ndarray): List of images to be cropped in format (h, w, c) in numpy.ndarray
+        Returns:
+        PIL.Image or numpy.ndarray: Cropped list of images
+        """
+
+        angle = random.uniform(self.degrees[0], self.degrees[1])
+        if isinstance(clip[0], np.ndarray):
+            rotated = [rotate(image=img, angle=angle, preserve_range=True) for img in clip]
+        elif isinstance(clip[0], PIL.Image.Image):
+            rotated = [img.rotate(angle) for img in clip]
+        else:
+            raise TypeError(f'Expected numpy.ndarray or PIL.Image, but got list of {type(clip[0])}')
+
+        return rotated
+
+
+class RandomResize(object):
+    """
+    Resizes a list of (H x W x C) numpy.ndarray to the final size. The larger the original image is, the more times it
+    takes to interpolate
+    Args:
+    interpolation (str): Can be one of 'nearest', 'bilinear', the default is the nearest
+    size (tuple): (width, height)
+    """
+
+    def __init__(self, ratio=(3./4., 4./3.), interpolation='nearest'):
+        self.ratio = ratio
+        self.interpolation = interpolation
+
+    def __call__(self, clip):
+        scalling_factor = random.uniform(self.ratio[0], self.ratio[1])
+
+        if isinstance(clip[0], np.ndarray):
+            img_h, img_w, _ = clip[0].shape
+        elif isinstance(clip[0], PIL.Image.Image):
+            img_w, img_h = clip[0].size
+
+        new_w = int(img_w * scalling_factor)
+        new_h = int(img_h * scalling_factor)
+        new_size = (new_w, new_h)
+        resized = resize_clip(clip, new_size, interpolation=self.interpolation)
+
+        return resized
+
+
 class AllAumgnetationTransform:
     def __init__(self, resize_param=None, rotation_param=None, flip_param=None, crop_param=None, jitter_param=None):
         self.transforms = []
@@ -60,7 +130,7 @@ class AllAumgnetationTransform:
             self.transforms.append(RandomFlip(**flip_param))
 
         if rotation_param is not None:
-            self.transforms.append(RnadomRotation(**rotation_param))
+            self.transforms.append(RandomRotation(**rotation_param))
 
         if resize_param is not None:
             self.transforms.append(RandomResize(**resize_param))
