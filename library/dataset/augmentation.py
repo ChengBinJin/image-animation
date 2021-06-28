@@ -1,10 +1,82 @@
 import random
 import numbers
 import PIL
+import warnings
+import torchvision
 import numpy as np
 
 from skimage.transform import rotate, resize
 from skimage.util import pad
+from skimage import img_as_ubyte, img_as_float
+
+
+def pad_clip(clip, h, w):
+    img_h, img_w = clip[0].shape[:2]
+    pad_h = (0, 0) if h < img_h else ((h - img_h) // 2, (h - img_h + 1) // 2)
+    pad_w = (0, 0) if w < img_w else ((w - img_w) // 2, (w - img_w + 1) // 2)
+    clip = pad(clip, ((0, 0), pad_h, pad_w, (0, 0)), mode='edge')
+
+    return clip
+
+
+def get_resize_sizes(img_h, img_w, size):
+    if img_w < img_h:
+        ow = size
+        oh = int(size * img_h / img_w)
+    else:
+        oh = size
+        ow = int(size * img_w / img_h)
+
+    return oh, ow
+
+
+def resize_clip(clip, size, interpolation='bilinear'):
+    if isinstance(clip[0], np.ndarray):
+        if isinstance(size, numbers.Number):
+            img_h, img_w, img_c = clip[0].shape
+
+            # Min spatial dim already matches minimal size
+            if min(img_h, img_w) == size:
+                return clip
+
+            new_h, new_w = get_resize_sizes(img_h, img_w, size)
+            size = (new_w, new_h)
+        else:
+            size = (size[1], size[0])
+
+        order = 1 if interpolation == 'bilinear' else 0
+        scaled = [resize(img, output_shape=size, order=order, preserve_range=True, mode='constant', anti_aliasing=True)
+                  for img in clip]
+    elif isinstance(clip[0], PIL.Image.Image):
+        if isinstance(size, numbers.Number):
+            img_w, img_h = clip[0].size
+
+            # Min spatial dim already matches minimal size
+            if min(img_h, img_w) == size:
+                return clip
+
+            new_h, new_w = get_resize_sizes(img_h, img_w, size)
+            size = (new_w, new_h)
+        else:
+            size = (size[1], size[0])
+
+        pil_inter = PIL.Image.NEAREST if interpolation == 'bilinear' else PIL.Image.BILINEAR
+        scaled = [img.resize(size, interpolation=pil_inter) for img in clip]
+    else:
+        raise TypeError(f'Expected numpy.ndarray or PIL.Image, but got list of {type(clip[0])}')
+
+    return scaled
+
+
+def crop_clip(clip, y, x, h, w):
+    if isinstance(clip[0], np.ndarray):
+        cropped = [img[y:y+h, x:x+w, :] for img in clip]
+    elif isinstance(clip[0], PIL.Image.Image):
+        cropped = [img.crop((x, y, x+w, y+h)) for img in clip]
+    else:
+        raise TypeError(f'Expected numpy.ndarray or PIL.Image, but got list of {type(clip[0])}')
+
+    return cropped
 
 
 class VideoToTensor(object):
@@ -145,22 +217,111 @@ class RandomCrop(object):
 
         h, w = self.size
         if isinstance(clip[0], np.ndarray):
-            img_h, img_w, img_c = clip[0].shape
+            img_h, img_w, _ = clip[0].shape
         elif isinstance(clip[0], PIL.Image.Image):
             img_w, img_h = clip[0].size
         else:
             raise TypeError(f'Expected numpy.ndarray or PIL.Image, but got list of {type(clip[0])}')
 
         clip = pad_clip(clip, h, w)
-        img_h, img_w = clip.shape[1:3]
-        ##############################################################
-        # Need to check
-        x1 = 0 if h == img_h else random.randint(0, img_w - w)
-        y1 = 0 if w == img_w else random.randint(0, img_h - h)
-        cropped = crop_clip(clip, y1, x1, h, w)
-        ##############################################################
+        x = 0 if w == img_w else random.randint(0, img_w - w)
+        y = 0 if h == img_h else random.randint(0, img_h - h)
+        cropped = crop_clip(clip, y, x, h, w)
 
         return cropped
+
+
+class ColorJitter(object):
+    """
+    Randomly change the brightness, contrast and saturation and hue of the clip
+    Args:
+    brightness (float): How much to jitter brightness. brightness_factor is chosen uniformly from
+        [max(0, 1-brightness), [1+brightness].
+    contrast (float): How much to jitter contrast. contrast_factor is chosen uniformly from
+        [max(0, 1-contrast), 1+contrast].
+    saturation (float): How much to jitter saturation. saturation_factor is chosen uniformly from
+        [max(0, 1-saturation), 1+saturation].
+    hue (float): How much to jitter hue. hue_factor is chosen uniformly from [-hue, hume]. Should be >=0 and <=0.5.
+    """
+
+    def __init__(self, brightness=0, contrast=0, saturation=0, hue=0):
+        self.brightness = brightness
+        self.contrast = contrast
+        self.saturation = saturation
+        self.hue = hue
+
+    @staticmethod
+    def get_params(brightness, contrast, saturation, hue):
+        if brightness > 0:
+            brightness_factor = random.uniform(a=max(0, 1 - brightness), b=(1 + brightness))
+        else:
+            brightness_factor = None
+
+        if contrast > 0:
+            contrast_factor = random.uniform(a=max(0, 1- contrast), b=(1 + contrast))
+        else:
+            contrast_factor = None
+
+        if saturation > 0:
+            saturation_factor = random.uniform(a=max(0, 1 - saturation), b=(1 + saturation))
+        else:
+            saturation_factor = None
+
+        if hue > 0:
+            hue_factor = random.uniform(a=(-1 * hue), b=hue)
+        else:
+            hue_factor = None
+
+        return brightness_factor, contrast_factor, saturation_factor, hue_factor
+
+    def __call__(self, clip):
+        """
+        Args:
+        clip (list): list of PIL.Image
+        Returns:
+        list PIL.Image: list of transformed PIL.Image
+        """
+
+        # Create img transform function sequence
+        def add_img_transforms():
+            img_transforms_ = []
+            if brightness is not None:
+                img_transforms_.append(lambda img: torchvision.transforms.functional.adjust_brighness(img, brightness))
+            if saturation is not None:
+                img_transforms_.append(lambda img: torchvision.transforms.functional.adjust_saturation(img, saturation))
+            if hue is not None:
+                img_transforms_.append(lambda img: torchvision.transforms.functional.adjust_hue(img, hue))
+            if contrast is not None:
+                img_transforms_.append(lambda img: torchvision.transforms.functional.adjust_contrast(img, contrast))
+            random.shuffle(img_transforms_)
+            return img_transforms_
+
+        brightness, contrast, saturation, hue = self.get_params(
+            self.brightness, self.contrast, self.saturation, self.hue)
+
+        if isinstance(clip[0], np.ndarray):
+            img_transforms = add_img_transforms()
+            img_transforms = [img_as_ubyte, torchvision.transforms.ToPILImage()] + img_transforms + \
+                             [np.array, img_as_float]
+
+        elif isinstance(clip[0], PIL.Image.Image):
+            img_transforms = add_img_transforms()
+
+        else:
+            raise TypeError(f'Expected numpy.ndarray or PIL.Image, but got list of {type(clip[0])}')
+
+        with warnings.catch_warnings():
+            warnings.simplefilter("ignore")
+
+            # Apply to all images
+            jittered_clip = []
+            for img in clip:
+                jittered_img = img
+                for func in img_transforms:
+                    jittered_img = func(jittered_img)
+                jittered_clip.append(jittered_img.astype('float32'))
+
+        return jittered_clip
 
 
 class AllAumgnetationTransform:
@@ -190,61 +351,3 @@ class AllAumgnetationTransform:
         for transform in self.transforms:
             clip = transform(clip)
         return clip
-
-
-def pad_clip(clip, h, w):
-    img_h, img_w = clip[0].shape[:2]
-    pad_h = (0, 0) if h < img_h else ((h - img_h) // 2, (h - img_h + 1) // 2)
-    pad_w = (0, 0) if w < img_w else ((w - img_w) // 2, (w - img_w + 1) // 2)
-    clip = pad(clip, ((0, 0), pad_h, pad_w, (0, 0)), mode='edge')
-
-    return clip
-
-
-def get_resize_sizes(img_h, img_w, size):
-    if img_w < img_h:
-        ow = size
-        oh = int(size * img_h / img_w)
-    else:
-        oh = size
-        ow = int(size * img_w / img_h)
-
-    return oh, ow
-
-
-def resize_clip(clip, size, interpolation='bilinear'):
-    if isinstance(clip[0], np.ndarray):
-        if isinstance(size, numbers.Number):
-            img_h, img_w, img_c = clip[0].shape
-
-            # Min spatial dim already matches minimal size
-            if min(img_h, img_w) == size:
-                return clip
-
-            new_h, new_w = get_resize_sizes(img_h, img_w, size)
-            size = (new_w, new_h)
-        else:
-            size = (size[1], size[0])
-
-        order = 1 if interpolation == 'bilinear' else 0
-        scaled = [resize(img, output_shape=size, order=order, preserve_range=True, mode='constant', anti_aliasing=True)
-                  for img in clip]
-    elif isinstance(clip[0], PIL.Image.Image):
-        if isinstance(size, numbers.Number):
-            img_w, img_h = clip[0].size
-
-            # Min spatial dim already matches minimal size
-            if min(img_h, img_w) == size:
-                return clip
-
-            new_h, new_w = get_resize_sizes(img_h, img_w, size)
-            size = (new_w, new_h)
-        else:
-            size = (size[1], size[0])
-
-        pil_inter = PIL.Image.NEAREST if interpolation == 'bilinear' else PIL.Image.BILINEAR
-        scaled = [img.resize(size, interpolation=pil_inter) for img in clip]
-    else:
-        raise TypeError(f'Expected numpy.ndarray or PIL.Image, but got list of {type(clip[0])}')
-
-    return scaled
