@@ -324,6 +324,17 @@ class ColorJitter(object):
         return jittered_clip
 
 
+class SplitSourceDriving(object):
+    def __call__(self, video):
+        source = np.array(video[:1], dtype='float32')
+        video = np.array(video[1:], dtype='float32')
+
+        out = dict()
+        out['video'] = video.transpose((3, 0, 1, 2))
+        out['source'] = source.transpose((3, 0, 1, 2))
+        return out
+
+
 class AllAumgnetationTransform:
     def __init__(self, resize_param=None, rotation_param=None, flip_param=None, crop_param=None, jitter_param=None):
         self.transforms = []

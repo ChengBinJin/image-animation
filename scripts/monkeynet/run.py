@@ -17,6 +17,10 @@ from library.modules.generator import MotionTransferGenerator
 from library.modules.discriminator import Discriminator
 from library.utils.files import get_name
 from library.dataset.frames_dataset import FramesDataset
+from library.pipeline.monkeynet.train import train
+from library.pipeline.monkeynet.reconstruction import reconstruction
+from library.pipeline.monkeynet.transfer import transfer
+from library.pipeline.monkeynet.prediction import prediction
 
 
 if __name__ == "__main__":
@@ -65,5 +69,20 @@ if __name__ == "__main__":
         print(discriminator, "\n")
 
     dataset = FramesDataset(is_train=(opt.mode == 'train'), **config['dataset_params'])
+
+    if opt.mode == 'train':
+        print("Training...")
+        train(config, generator, discriminator, kp_detector, opt.checkpoint, log_dir, dataset, opt.device_ids)
+    elif opt.mode == 'reconstruction':
+        print("Reconstruction...")
+        reconstruction(config, generator, kp_detector, opt.checkpoint, log_dir, dataset)
+    elif opt.mode == "transfer":
+        print("Transfer...")
+        transfer(config, generator, kp_detector, opt.checkpoint, log_dir, dataset)
+    elif opt.mode == 'prediction':
+        print("Prediction...")
+        prediction(config, generator, kp_detector, opt.checkpoint, log_dir)
+    else:
+        raise ValueError(' [!] Mode should be one of the [train, reconstruction, transfer, prediciton]!')
 
     print("SUCCESS")
