@@ -3,8 +3,8 @@ import torch.nn.functional as F
 
 from torch import nn
 
-from library.modules.dense_motion import MovementEmbeddingModule
-from library.modules.block import DownBlock3DDis
+from library.module.dense_motion import MovementEmbeddingModule
+from library.module.block import DownBlock3DDis
 
 
 class Discriminator(nn.Module):

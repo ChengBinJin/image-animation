@@ -12,15 +12,15 @@ source_file_dir = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
 project_dir = os.path.split(source_file_dir)[0]
 sys.path.append(project_dir)
 
-from library.modules.keypoint_detector import KPDetector
-from library.modules.generator import MotionTransferGenerator
-from library.modules.discriminator import Discriminator
+from library.module.keypoint_detector import KPDetector
+from library.module.generator import MotionTransferGenerator
+from library.module.discriminator import Discriminator
 from library.utils.files import get_name
 from library.dataset.frames_dataset import FramesDataset
-from library.pipeline.monkeynet.train import train
-from library.pipeline.monkeynet.reconstruction import reconstruction
-from library.pipeline.monkeynet.transfer import transfer
-from library.pipeline.monkeynet.prediction import prediction
+from library.pipeline.train import train
+from library.pipeline.reconstruction import reconstruction
+from library.pipeline.transfer import transfer
+from library.pipeline.prediction import prediction
 
 
 if __name__ == "__main__":

@@ -2,8 +2,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from library.modules.block import Encoder, Decoder, ResBlock3D
-from library.modules.dense_motion import MovementEmbeddingModule, DenseMotionModule, IdentityDeformation
+from library.module.block import Encoder, Decoder, ResBlock3D
+from library.module.dense_motion import MovementEmbeddingModule, DenseMotionModule, IdentityDeformation
 
 
 class MotionTransferGenerator(nn.Module):

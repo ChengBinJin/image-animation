@@ -4,7 +4,7 @@ from torch import nn
 
 from library.utils.keypoint import kp2gaussian
 from library.utils.flow import make_coordinate_grid
-from library.modules.block import SameBlock3D, Hourglass
+from library.module.block import SameBlock3D, Hourglass
 
 
 class MovementEmbeddingModule(nn.Module):
