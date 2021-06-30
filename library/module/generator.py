@@ -4,6 +4,8 @@ from torch import nn
 
 from library.module.block import Encoder, Decoder, ResBlock3D
 from library.module.dense_motion import MovementEmbeddingModule, DenseMotionModule, IdentityDeformation
+from library.utils.keypoint import split_kp
+from library.utils.loss import generator_loss
 
 
 class MotionTransferGenerator(nn.Module):

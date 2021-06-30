@@ -56,8 +56,8 @@ train_params:
   lr: 2.0e-4
   batch_size: 32
   loss_weights:
-    reconstruction: [10, 10, 10, 10, 1]
-    reconstruction_deformed: 0
+    feature_matching: [10, 10, 10, 10, 1]
+    reconstruction: 0
     generator_gan: 1
     discriminator_gan: 1
   log_params:

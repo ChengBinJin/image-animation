@@ -115,6 +115,17 @@ def normalize_kp(kp_video, kp_appearance, movement_mult=False, move_location=Fal
     return kp_video
 
 
+def split_kp(kp_joined, detach=False):
+    if detach:
+        kp_video = {k: v[:, 1:].detach() for k, v in kp_joined.items()}
+        kp_appearance = {k: v[:, :1].detach() for k, v in kp_joined.items()}
+    else:
+        kp_video = {k: v[:, 1:] for k, v in kp_joined.items()}
+        kp_appearance = {k: v[:, :1] for k, v in kp_joined.itmes()}
 
+    out = dict()
+    out['kp_driving'] = kp_video
+    out['kp_source'] = kp_appearance
 
+    return out
 

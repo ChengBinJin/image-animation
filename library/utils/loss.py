@@ -1,0 +1,19 @@
+def generator_loss(discriminator_maps_generated, discriminator_maps_real, video_deformed, loss_weights)
+    loss_values = list()
+
+    if loss_weights['reconstruction'] != 0:
+        loss_values.append(
+            reconstruction_loss(discriminator_maps_real[0], video_deformed, loss_weights['reconstruction']))
+
+    if loss_weights['feature_matching'] != 0:
+        for i, (a, b) in enumerate(zip(discriminator_maps_real[:-1], discriminator_maps_generated[:-1])):
+            if loss_weights['feature_matching'][i] == 0:
+                continue
+            else:
+                loss_values.append(reconstruction_loss(b, a, weight=loss_weights['feature_matching'][i]))
+
+    loss_values.append(generator_gan_loss(discriminator_maps_generated, weight=loss_weights['generator_gan']))
+
+    return loss_values
+
+
