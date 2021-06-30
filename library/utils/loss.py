@@ -6,12 +6,19 @@ def mean_batch(val):
     return out
 
 
-def reonstruction_loss(prediction, target, weight):
+def reconstruction_loss(prediction, target, weight):
     if weight == 0:
         out = 0
     else:
         out = weight * mean_batch(torch.abs(prediction - target))
     return out
+
+
+def generator_gan_loss(discriminator_maps_generated, weight):
+    scores_generated = discriminator_maps_generated[-1]
+    score = (1 - scores_generated) ** 2
+    score = weight * mean_batch(score)
+    return score
 
 
 def generator_loss(discriminator_maps_generated, discriminator_maps_real, video_deformed, loss_weights):

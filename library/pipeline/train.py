@@ -3,8 +3,8 @@ import torch
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
 
-from library.utils.logger import Logger
-from library.module.generator import GeneratorFullModel
+from library.utils.logger.logger import Logger
+from library.modules.model import GeneratorFullModel
 
 
 def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, dataset, device_ids):
