@@ -1,4 +1,20 @@
-def generator_loss(discriminator_maps_generated, discriminator_maps_real, video_deformed, loss_weights)
+import torch
+
+
+def mean_batch(val):
+    out = val.view(val.shape[0], -1).mean(-1)
+    return out
+
+
+def reonstruction_loss(prediction, target, weight):
+    if weight == 0:
+        out = 0
+    else:
+        out = weight * mean_batch(torch.abs(prediction - target))
+    return out
+
+
+def generator_loss(discriminator_maps_generated, discriminator_maps_real, video_deformed, loss_weights):
     loss_values = list()
 
     if loss_weights['reconstruction'] != 0:
