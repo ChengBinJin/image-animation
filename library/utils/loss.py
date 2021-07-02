@@ -21,6 +21,14 @@ def generator_gan_loss(discriminator_maps_generated, weight):
     return score
 
 
+def discriminator_gan_loss(discriminator_maps_generated, discriminator_maps_real, weight):
+    scores_real = discriminator_maps_real[-1]
+    scores_generated = discriminator_maps_generated[-1]
+    score = (1 - scores_real) ** 2 + scores_generated ** 2  # lsgan
+    score = weight * mean_batch(score)
+    return score
+
+
 def generator_loss(discriminator_maps_generated, discriminator_maps_real, video_deformed, loss_weights):
     loss_values = list()
 
@@ -40,3 +48,7 @@ def generator_loss(discriminator_maps_generated, discriminator_maps_real, video_
     return loss_values
 
 
+def discriminator_loss(discriminator_maps_generated, discriminator_maps_real, loss_weights):
+    loss_values = [discriminator_gan_loss(discriminator_maps_generated, discriminator_maps_real,
+                                          loss_weights['discriminator_gan'])]
+    return loss_values
