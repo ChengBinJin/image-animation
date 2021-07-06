@@ -29,6 +29,25 @@ def discriminator_gan_loss(discriminator_maps_generated, discriminator_maps_real
     return score
 
 
+def generator_loss_names(loss_weights):
+    loss_names = list()
+    if loss_weights['reconstruction'] != 0:
+        loss_names.append("rec_def")
+
+    if loss_weights['feature_matching'] is not None:
+        for i, _ in enumerate(loss_weights['feature_matching']):
+            if loss_weights['feature_matching'][i] == 0:
+                continue
+            loss_names.append(f"layer-{str(i).zfill(2)}_feature_matching")
+    loss_names.append("gen_gan")
+
+    return loss_names
+
+
+def discriminator_loss_names():
+    return ['disc_gan']
+
+
 def generator_loss(discriminator_maps_generated, discriminator_maps_real, video_deformed, loss_weights):
     loss_values = list()
 

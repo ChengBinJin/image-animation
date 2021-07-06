@@ -1,6 +1,6 @@
 dataset_params:
-  root_dir: data/moving-gif-128
-  image_shape: [128, 128, 3]
+  root_dir: /workspace/cpfs-data/Data/image_animation/monkey_net/MGif/moving-gif-128
+  img_shape: [128, 128, 3]
 #  pairs_list: pairs.csv
   augmentation_params:
     flip_param:
@@ -62,10 +62,10 @@ train_params:
   num_epochs: 750
   epoch_milestones: [500]
   lr: 2.0e-4
-  batch_size: 64
+  batch_size: 8  # 32 for one gpu
   loss_weights:
-    reconstruction: [10, 10, 10, 10, 1]
-    reconstruction_deformed: 0
+    feature_matching: [10, 10, 10, 10, 1]
+    reconstruction: 0
     generator_gan: 1
     discriminator_gan: 1
   log_params:

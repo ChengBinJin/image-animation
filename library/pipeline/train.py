@@ -1,10 +1,13 @@
 import torch
 
+from tqdm import trange
 from torch.optim.lr_scheduler import MultiStepLR
 from torch.utils.data import DataLoader
 
 from library.utils.logger.logger import Logger
-from library.modules.model import GeneratorFullModel
+from library.modules.model import GeneratorFullModel, DiscriminatorFullModel
+from library.third_partys.sync_batchnorm import DataParallelWithCallback
+from library.utils.loss import generator_loss_names, discriminator_loss_names
 
 
 def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, dataset, device_ids):
@@ -32,3 +35,57 @@ def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, da
     generator_full = GeneratorFullModel(kp_detector, generator, discriminator, train_params)
     discriminator_full = DiscriminatorFullModel(kp_detector, generator, discriminator, train_params)
 
+    generator_full = DataParallelWithCallback(generator_full, device_ids=device_ids)
+    discriminator_full = DataParallelWithCallback(discriminator_full, device_ids=device_ids)
+
+    with Logger(log_dir=log_dir, visualizer_params=config['visualizer_params'], **train_params['log_params']) as logger:
+        for epoch in trange(start_epoch, train_params['num_epochs']):
+            for x in dataloader:
+                out = generator_full(x)
+                loss_values = out[:-2]
+                generated = out[-2]
+                kp_joined = out[-1]
+                loss_values = [val.mean() for val in loss_values]
+                loss = sum(loss_values)
+
+                loss.backward(retain_graph=not train_params['detach_kp_discriminator'])
+                optimizer_generator.step()
+                optimizer_generator.zero_grad()
+                optimizer_discriminator.zero_grad()
+                if train_params['detach_kp_discriminator']:
+                    optimizer_kp_detector.step()
+                    optimizer_kp_detector.zero_grad()
+
+                generator_loss_values = [val.detach().cpu().numpy() for val in loss_values]
+
+                loss_values = discriminator_full(x, kp_joined, generated)
+                loss_values = [val.mean() for val in loss_values]
+                loss = sum(loss_values)
+
+                loss.backward()
+                optimizer_discriminator.step()
+                optimizer_discriminator.zero_grad()
+                if not train_params['detach_kp_discriminator']:
+                    optimizer_kp_detector.step()
+                    optimizer_kp_detector.zero_grad()
+
+                discriminator_loss_values = [val.detach().cpu().numpy() for val in loss_values]
+
+                logger.log_iter(it,
+                                names=generator_loss_names(train_params['loss_weights']) + discriminator_loss_names(),
+                                values=generator_loss_values + discriminator_loss_values, inp=x, out=generated)
+
+                it += 1
+
+            scheduler_kp_detector.step()
+            scheduler_generator.step()
+            scheduler_discriminator.step()
+
+            logger.log_epoch(epoch, {
+                'kp_detector': kp_detector,
+                'generator': generator,
+                'discriminator': discriminator,
+                'optimizer_kp_detector': optimizer_kp_detector,
+                'optimizer_generator': optimizer_generator,
+                'optimizer_discriminator': optimizer_discriminator,
+            })

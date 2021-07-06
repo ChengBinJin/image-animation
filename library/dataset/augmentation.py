@@ -6,7 +6,7 @@ import torchvision
 import numpy as np
 
 from skimage.transform import rotate, resize
-from skimage.util import pad
+# from skimage.util import pad
 from skimage import img_as_ubyte, img_as_float
 
 
@@ -14,7 +14,8 @@ def pad_clip(clip, h, w):
     img_h, img_w = clip[0].shape[:2]
     pad_h = (0, 0) if h < img_h else ((h - img_h) // 2, (h - img_h + 1) // 2)
     pad_w = (0, 0) if w < img_w else ((w - img_w) // 2, (w - img_w + 1) // 2)
-    clip = pad(clip, ((0, 0), pad_h, pad_w, (0, 0)), mode='edge')
+    # clip = pad(clip, ((0, 0), pad_h, pad_w, (0, 0)), mode='edge')
+    clip = np.pad(clip, ((0, 0), pad_h, pad_w, (0, 0)), mode='edge')
 
     return clip
 
@@ -216,14 +217,9 @@ class RandomCrop(object):
         """
 
         h, w = self.size
-        if isinstance(clip[0], np.ndarray):
-            img_h, img_w, _ = clip[0].shape
-        elif isinstance(clip[0], PIL.Image.Image):
-            img_w, img_h = clip[0].size
-        else:
-            raise TypeError(f'Expected numpy.ndarray or PIL.Image, but got list of {type(clip[0])}')
-
         clip = pad_clip(clip, h, w)
+        img_h, img_w = clip.shape[1:3]
+
         x = 0 if w == img_w else random.randint(0, img_w - w)
         y = 0 if h == img_h else random.randint(0, img_h - h)
         cropped = crop_clip(clip, y, x, h, w)
@@ -335,7 +331,7 @@ class SplitSourceDriving(object):
         return out
 
 
-class AllAumgnetationTransform:
+class AllAugmentationTransform:
     def __init__(self, resize_param=None, rotation_param=None, flip_param=None, crop_param=None, jitter_param=None):
         self.transforms = []
         self.select = SelectRandomFrames()

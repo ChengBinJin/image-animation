@@ -121,7 +121,7 @@ def split_kp(kp_joined, detach=False):
         kp_appearance = {k: v[:, :1].detach() for k, v in kp_joined.items()}
     else:
         kp_video = {k: v[:, 1:] for k, v in kp_joined.items()}
-        kp_appearance = {k: v[:, :1] for k, v in kp_joined.itmes()}
+        kp_appearance = {k: v[:, :1] for k, v in kp_joined.items()}
 
     out = dict()
     out['kp_driving'] = kp_video

@@ -2,7 +2,7 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from library.sync_batchnorm import SynchronizedBatchNorm3d as BatchNorm3d
+from library.third_partys.sync_batchnorm import SynchronizedBatchNorm3d as BatchNorm3d
 
 
 class Encoder(nn.Module):

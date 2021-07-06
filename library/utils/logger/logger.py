@@ -37,8 +37,10 @@ class Logger:
         self.log_file.flush()
 
     def visualize_rec(self, inp, out):
-        image = self.visualizer.visualize(inp['source'], inp['driving'], out)
-        imageio.imsave(os.path.join(self.visualizations_dir, "%s-rec.png" % str(self.epoch).zfill(self.zfill_num)), image)
+        imgs = self.visualizer.visualize_reconstruction(inp, out)
+        for i, img in enumerate(imgs):
+            imageio.imsave(
+                os.path.join(self.visualizations_dir, f"{str(self.it).zfill(self.zfill_num)}-rec-{i}.png"), img)
 
     def save_cpk(self):
         cpk = {k: v.state_dict() for k, v in self.models.items()}
@@ -182,7 +184,7 @@ class Visualizer:
 
         image = self.create_image_grid((appearance_video_batch, kp_appearance),
                                        (gt_video_batch, kp_video),
-                                       out_video_batch, appearance_deformed_batch, gt_video_batch)
+                                       appearance_deformed_batch, out_video_batch, gt_video_batch)
         image = (255 * image).astype(np.uint8)
 
         return image

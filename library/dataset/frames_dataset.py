@@ -53,8 +53,7 @@ class FramesDataset(Dataset):
 
     def __len__(self):
         num_train_imgs = len(self.train_img_names)
-        num_test_imgs = len(self.test_img_names)
-        return tuple([num_train_imgs, num_test_imgs])
+        return num_train_imgs
 
     def __getitem__(self, idx):
         if self.is_train:
