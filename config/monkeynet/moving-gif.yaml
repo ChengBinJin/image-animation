@@ -59,10 +59,10 @@ model_params:
 train_params:
   detach_kp_generator: False
   detach_kp_discriminator: True
-  num_epochs: 750
+  num_epochs: 150  # 750
   epoch_milestones: [500]
   lr: 2.0e-4
-  batch_size: 8  # 32 for one gpu
+  batch_size: 8  # 32 for one gpu, 8 for debug
   loss_weights:
     feature_matching: [10, 10, 10, 10, 1]
     reconstruction: 0

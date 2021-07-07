@@ -26,7 +26,7 @@ from library.pipeline.train import train
 if __name__ == "__main__":
     parser = ArgumentParser()
     # parser.add_argument("--config", required=True, help="path to config")
-    parser.add_argument("--config", default='/workspace/nas-data/Codes/H0088_image-animation/config/monkeynet/moving-gif.yaml', help="path to config")
+    parser.add_argument("--config", default='/workspace/nas-data/Codes/H0088_image-animation/config/monkeynet/taichi.yaml', help="path to config")
     # parser.add_argument("--config", default='config/monkeynet/moving-gif.yaml', help="path to config")
     parser.add_argument("--mode", default="train", choices=["train", "reconstruction", "transfer", "prediction"])
     parser.add_argument("--log_dir", default="logs/monkeynet", help="path to log into")

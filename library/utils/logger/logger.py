@@ -3,7 +3,7 @@ import imageio
 import torch
 import numpy as np
 import matplotlib.pyplot as plt
-from skimage.draw import circle
+from skimage.draw import disk
 
 
 class Logger:
@@ -38,9 +38,7 @@ class Logger:
 
     def visualize_rec(self, inp, out):
         imgs = self.visualizer.visualize_reconstruction(inp, out)
-        for i, img in enumerate(imgs):
-            imageio.imsave(
-                os.path.join(self.visualizations_dir, f"{str(self.it).zfill(self.zfill_num)}-rec-{i}.png"), img)
+        imageio.imsave(os.path.join(self.visualizations_dir, f"{str(self.it).zfill(self.zfill_num)}-rec.png"), imgs)
 
     def save_cpk(self):
         cpk = {k: v.state_dict() for k, v in self.models.items()}
@@ -107,7 +105,7 @@ class Visualizer:
 
         for i in range(len(video_array)):
             for kp_ind, kp in enumerate(kp_array[i]):
-                rr, cc = circle(kp[1], kp[0], self.kp_size, shape=video_array.shape[1:3])
+                rr, cc = disk((kp[1], kp[0]), self.kp_size, shape=video_array.shape[1:3])
                 video_array[i][rr, cc] = np.array(self.colormap(kp_ind / num_kp))[:3]
         return video_array
 
@@ -157,7 +155,7 @@ class Visualizer:
                                        (video_first_frame, kp_video_first),
                                        (motion_video_batch, kp_video),
                                        (out_video_batch, kp_norm),
-                                       out_video_batch, appearance_video_batch)
+                                       out_video_batch, appearance_deformed_batch)
         image = (255 * image).astype(np.uint8)
 
         return image
@@ -185,8 +183,7 @@ class Visualizer:
         image = self.create_image_grid((appearance_video_batch, kp_appearance),
                                        (gt_video_batch, kp_video),
                                        appearance_deformed_batch, out_video_batch, gt_video_batch)
-        image = (255 * image).astype(np.uint8)
+        image = (255 * np.squeeze(image)).astype(np.uint8)
 
         return image
-
 
