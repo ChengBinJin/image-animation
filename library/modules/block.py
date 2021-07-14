@@ -27,7 +27,8 @@ class Encoder(nn.Module):
     def forward(self, x):
         outs = [x]
         for down_block in self.down_blocks:
-            outs.append(down_block(outs[-1]))
+            out = down_block(outs[-1])
+            outs.append(out)
         return outs
 
 

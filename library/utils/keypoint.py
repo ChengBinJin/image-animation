@@ -49,20 +49,20 @@ def gaussian2kp(heatmap, kp_variance='matrix', clip_variance=None):
     """
     Extract the mean and the variance from a heatmp
     """
-    shape = heatmap.shape                   # [N, kp, 3, H/2, W/2]
+    shape = heatmap.shape                   # [N, kp, 1, h, w]
     # adding small eps to avoid 'nan' in variance
-    heatmap = heatmap.unsqueeze(-1) + 1e-7  # [N, kp, 3, H/2, W/2, 1]
+    heatmap = heatmap.unsqueeze(-1) + 1e-7  # [N, kp, 2, h, w, 1]
     grid = make_coordinate_grid(shape[3:], heatmap.type()).unsqueeze_(0).unsqueeze_(0).unsqueeze_(0)  # [1, 1, 1, H/2, W/2, 2]
 
-    mean = (heatmap * grid).sum(dim=(3, 4))  # [N, kp, 3, 2]
-    kp = {'mean': mean.permute(0, 2, 1, 3)}  # [N, 3, kp, 2]
+    mean = (heatmap * grid).sum(dim=(3, 4))  # [N, kp, 2, 1]
+    kp = {'mean': mean.permute(0, 2, 1, 3)}  # [N, 2, kp, 1]
 
     if kp_variance == 'matrix':
-        mean_sub = grid - mean.unsqueeze(-2).unsqueeze(-2)  # [N, kp, 3, H/2, W/2, 2]
-        var = torch.matmul(mean_sub.unsqueeze(-1), mean_sub.unsqueeze(-2))  # [N, kp, 3, H/2, W/2, 2, 2]
-        var = var * heatmap.unsqueeze(-1)                   # [N, kp, 3, H/2, W/2, 2, 2]
-        var = var.sum(dim=(3, 4))                           # [N, kp, 3, 2, 2]
-        var = var.permute(0, 2, 1, 3, 4)                    # [N, 3, kp, 2, 2]
+        mean_sub = grid - mean.unsqueeze(-2).unsqueeze(-2)  # [N, kp, 2, h, w, 2]
+        var = torch.matmul(mean_sub.unsqueeze(-1), mean_sub.unsqueeze(-2))  # [N, kp, 2, h, w, 2, 2]
+        var = var * heatmap.unsqueeze(-1)                   # [N, kp, 2, h, w, 2, 2]
+        var = var.sum(dim=(3, 4))                           # [N, kp, 2, 2, 2]
+        var = var.permute(0, 2, 1, 3, 4)                    # [N, 2, kp, 2, 2]
         if clip_variance:
             min_norm = torch.tensor(clip_variance).type(var.type())
             sg = smallest_singular(var).unsqueeze(-1)
@@ -116,16 +116,18 @@ def normalize_kp(kp_video, kp_appearance, movement_mult=False, move_location=Fal
 
 
 def split_kp(kp_joined, detach=False):
+    # kp_jointed    - mean:    (N, 2, kp, 2)
+    #               - var:      (N, 2, kp, 2, 2)
     if detach:
-        kp_video = {k: v[:, 1:].detach() for k, v in kp_joined.items()}
         kp_appearance = {k: v[:, :1].detach() for k, v in kp_joined.items()}
+        kp_video = {k: v[:, 1:].detach() for k, v in kp_joined.items()}
     else:
-        kp_video = {k: v[:, 1:] for k, v in kp_joined.items()}
         kp_appearance = {k: v[:, :1] for k, v in kp_joined.items()}
+        kp_video = {k: v[:, 1:] for k, v in kp_joined.items()}
 
     out = dict()
-    out['kp_driving'] = kp_video
     out['kp_source'] = kp_appearance
+    out['kp_driving'] = kp_video
 
     return out
 

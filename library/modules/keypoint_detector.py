@@ -26,11 +26,11 @@ class KPDetector(nn.Module):
 
     def forward(self, x):  # x shape: (N, 3, 1, H, W)
         if self.scale_factor != 1:
-            x = F.interpolate(x, scale_factor=(1, self.scale_factor, self.scale_factor), recompute_scale_factor=True)
+            x = F.interpolate(x, scale_factor=(1, self.scale_factor, self.scale_factor), recompute_scale_factor=False)
 
-        heatmap = self.predictor(x)     # [N, kp, 1, H/2, W/2]
-        final_shape = heatmap.shape     # [N, kp, 1, H/2, W/2]
-        heatmap = heatmap.view(final_shape[0], final_shape[1], final_shape[2], -1)  # [N, kp, 1, H/2*W/2]
+        heatmap = self.predictor(x)     # [N, kp, 1, h, w]
+        final_shape = heatmap.shape     # [N, kp, 1, h, w]
+        heatmap = heatmap.view(final_shape[0], final_shape[1], final_shape[2], -1)  # [N, kp, 1, h*w]
         heatmap = F.softmax(heatmap / self.temperature, dim=3)                      # [N, kp, 1, H/2*W/2]
         heatmap = heatmap.view(*final_shape)                                        # [N, kp, 1, H/2, W/2]
         out = gaussian2kp(heatmap, self.kp_variance, self.clip_variance)

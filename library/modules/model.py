@@ -17,7 +17,11 @@ class GeneratorFullModel(torch.nn.Module):
         self.train_params = train_params
 
     def forward(self, x):
+        # x['source'] shape: (N, 3, 1, H, W)
+        # x['video'] shape: (N, 3, 1, H, W)
         kp_joined = self.kp_extractor(torch.cat([x['source'], x['video']], dim=2))
+        # kp_jointed    - mean:    (N, 2, kp, 2)
+        #               - var:      (N, 2, kp, 2, 2)
         generated = self.generator(x['source'], **split_kp(kp_joined, self.train_params['detach_kp_generator']))
 
         video_prediction = generated['video_prediction']

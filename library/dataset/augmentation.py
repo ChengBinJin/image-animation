@@ -254,7 +254,7 @@ class ColorJitter(object):
             brightness_factor = None
 
         if contrast > 0:
-            contrast_factor = random.uniform(a=max(0, 1- contrast), b=(1 + contrast))
+            contrast_factor = random.uniform(a=max(0, 1 - contrast), b=(1 + contrast))
         else:
             contrast_factor = None
 
@@ -282,7 +282,7 @@ class ColorJitter(object):
         def add_img_transforms():
             img_transforms_ = []
             if brightness is not None:
-                img_transforms_.append(lambda img: torchvision.transforms.functional.adjust_brighness(img, brightness))
+                img_transforms_.append(lambda img: torchvision.transforms.functional.adjust_brightness(img, brightness))
             if saturation is not None:
                 img_transforms_.append(lambda img: torchvision.transforms.functional.adjust_saturation(img, saturation))
             if hue is not None:

@@ -34,7 +34,7 @@ def smallest_singular(batch_of_matrix):
     s2 = torch.sqrt(s2 + 4 * (a * c + b * d) ** 2)
     norm = torch.sqrt((s1 - s2) / 2)
 
-    return norm
+    return norm  # (N, 2, kp, 1)
 
 
 def make_symetric_matrix(torch_matrix):
