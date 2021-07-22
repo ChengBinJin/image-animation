@@ -53,9 +53,9 @@ class MovementEmbeddingModule(nn.Module):
             source_image = F.interpolate(
                 source_image, scale_factor=(1, self.scale_factor, self.scale_factor), recompute_scale_factor=True)
 
-        spatial_size = source_image.shape[3:]       # (H, W)
+        spatial_size = source_image.shape[3:]       # (h, w)
 
-        bs, _, _, h, w = source_image.shape         # (N, 3, 1, H, W)
+        bs, _, _, h, w = source_image.shape         # (N, 3, 1, h, w)
         _, d, num_kp, _ = kp_driving['mean'].shape  # (N, 1, num_kp, 2)
 
         inputs = []
@@ -109,8 +109,8 @@ class MovementEmbeddingModule(nn.Module):
             inputs.append(appearance_approx_deform)
 
         movement_encoding = torch.cat(inputs, dim=3)  # (N, 1, num_kp+1, 1+3, H, W)
-        movement_encoding = movement_encoding.view(bs, d, -1, h, w)     # (N, 1, 11*(1+3), H, W)
-        movement_encoding = movement_encoding.permute(0, 2, 1, 3, 4)    # (N, 11*(1+3), 1, H, W)
+        movement_encoding = movement_encoding.view(bs, d, -1, h, w)     # (N, 1, 11*(1+2+3), H, W)
+        movement_encoding = movement_encoding.permute(0, 2, 1, 3, 4)    # (N, 11*(1+2+3), 1, H, W)
 
         return movement_encoding
 
@@ -165,10 +165,10 @@ class DenseMotionModule(nn.Module):
                 source_image, scale_factor=(1, self.scale_factor, self.scale_factor), recompute_scale_factor=True)
 
         prediction = self.mask_embedding(source_image, kp_driving, kp_source)
-        # prediction:   (N, (num_kp+1)*(1+3), 1, H, W)
+        # prediction:   (N, (num_kp+1)*(1+2+3), 1, H, W)
         for block in self.group_blocks:
             prediction = block(prediction)
-            prediction = F.leaky_relu(prediction, 0.2)
+            # prediction = F.leaky_relu(prediction, 0.2)  # block already includes relu
         # prediction:   (N, (num_kp+1)*(1+3), 1, H, W)
         prediction = self.hourglass(prediction)  # (N, (num_kp+1)+2, 1, H, W)
 

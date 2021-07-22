@@ -1,4 +1,6 @@
+import time
 import torch
+import numpy as np
 
 from tqdm import trange
 from torch.optim.lr_scheduler import MultiStepLR
@@ -8,10 +10,12 @@ from library.utils.logger.logger import Logger
 from library.modules.model import GeneratorFullModel, DiscriminatorFullModel
 from library.third_partys.sync_batchnorm import DataParallelWithCallback
 from library.utils.loss import generator_loss_names, discriminator_loss_names
+from library.dataset.augmentation import worker_init_fn
 
 
 def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, dataset, device_ids):
     train_params = config['train_params']
+    initial_seed = int(time.time())
 
     optimizer_generator = torch.optim.Adam(generator.parameters(), lr=train_params['lr'], betas=(0.5, 0.999))
     optimizer_discriminator = torch.optim.Adam(discriminator.parameters(), lr=train_params['lr'], betas=(0.5, 0.999))
@@ -30,7 +34,8 @@ def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, da
     scheduler_kp_detector = MultiStepLR(optimizer_kp_detector, train_params['epoch_milestones'], gamma=0.1,
                                         last_epoch=start_epoch-1)
 
-    dataloader = DataLoader(dataset, batch_size=train_params['batch_size'], shuffle=True, num_workers=4, drop_last=True)
+    dataloader = DataLoader(dataset, batch_size=train_params['batch_size'], shuffle=True, num_workers=4,
+                            worker_init_fn=worker_init_fn, drop_last=True)
 
     generator_full = GeneratorFullModel(kp_detector, generator, discriminator, train_params)
     discriminator_full = DiscriminatorFullModel(kp_detector, generator, discriminator, train_params)
@@ -40,6 +45,8 @@ def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, da
 
     with Logger(log_dir=log_dir, visualizer_params=config['visualizer_params'], **train_params['log_params']) as logger:
         for epoch in trange(start_epoch, train_params['num_epochs']):
+            np.random.seed(initial_seed + epoch)
+
             for x in dataloader:
                 out = generator_full(x)
                 loss_values = out[:-2]

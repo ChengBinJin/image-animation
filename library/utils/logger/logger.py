@@ -54,17 +54,23 @@ class Logger:
 
         if kp_detector is not None:
             kp_detector.load_state_dict(checkpoint['kp_detector'])
+            print(f" [*] Load kp_detector SUCCESS!")
         if generator is not None:
             generator.load_state_dict(checkpoint['generator'])
+            print(f" [*] Load generator SUCCESS!")
         if discriminator is not None:
             discriminator.load_state_dict(checkpoint['discriminator'])
+            print(f" [*] Load discriminator SUCCESS!")
 
         if optimizer_kp_detector is not None:
             optimizer_kp_detector.load_state_dict(checkpoint['optimizer_kp_detector'])
+            print(f" [*] Load optimizer_kp_detector SUCCESS!")
         if optimizer_generator is not None:
             optimizer_generator.load_state_dict(checkpoint['optimizer_generator'])
+            print(f" [*] Load optimizer_generator_detector SUCCESS!")
         if optimizer_discriminator is not None:
             optimizer_discriminator.load_state_dict(checkpoint['optimizer_discriminator'])
+            print(f" [*] Load optimizer_discriminator_detector SUCCESS!")
 
         return checkpoint['epoch'], checkpoint['it']
 

@@ -65,7 +65,7 @@ train_params:
   num_epochs: 150  # 750
   epoch_milestones: [500]
   lr: 2.0e-4
-  batch_size: 1  # 32 for one gpu, 8 for debug
+  batch_size: 2  # 32 for one gpu, 8 for debug
   loss_weights:
     feature_matching: [10, 10, 10, 10, 1]
     reconstruction: 0

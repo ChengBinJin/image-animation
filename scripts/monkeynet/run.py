@@ -18,7 +18,7 @@ from library.modules.discriminator import Discriminator
 from library.utils.files import get_name
 from library.dataset.frames_dataset import FramesDataset
 from library.pipeline.train import train
-# from library.pipeline.reconstruction import reconstruction
+from library.pipeline.reconstruction import reconstruction
 # from library.pipeline.transfer import transfer
 # from library.pipeline.prediction import prediction
 
@@ -74,9 +74,9 @@ if __name__ == "__main__":
     if opt.mode == 'train':
         print("Training...")
         train(config, generator, discriminator, kp_detector, opt.checkpoint, log_dir, dataset, opt.device_ids)
-    # elif opt.mode == 'reconstruction':
-    #     print("Reconstruction...")
-    #     reconstruction(config, generator, kp_detector, opt.checkpoint, log_dir, dataset)
+    elif opt.mode == 'reconstruction':
+        print("Reconstruction...")
+        reconstruction(config, generator, kp_detector, opt.checkpoint, log_dir, dataset)
     # elif opt.mode == "transfer":
     #     print("Transfer...")
     #     transfer(config, generator, kp_detector, opt.checkpoint, log_dir, dataset)

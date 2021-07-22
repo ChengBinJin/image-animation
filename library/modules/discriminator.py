@@ -40,7 +40,7 @@ class Discriminator(nn.Module):
     def forward(self, x, kp_driving, kp_source):
         out_maps = [x]
         if self.scale_factor != 1:
-            x = F.interpolate(x, kp_driving, kp_source)
+            x = F.interpolate(x, scale_factor=(1, self.scale_factor, self.scale_factor))
 
         if self.kp_embedding:
             heatmap = self.kp_embedding(x, kp_driving, kp_source)

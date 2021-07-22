@@ -6,8 +6,11 @@ import torchvision
 import numpy as np
 
 from skimage.transform import rotate, resize
-# from skimage.util import pad
 from skimage import img_as_ubyte, img_as_float
+
+
+def worker_init_fn(worker_id):
+    np.random.seed(np.random.get_state()[1][0] + worker_id)
 
 
 def pad_clip(clip, h, w):
