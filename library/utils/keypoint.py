@@ -1,15 +1,40 @@
 import torch
 import numpy as np
-
+from tqdm import tqdm
 from scipy.spatial import ConvexHull
+
 from library.utils.matrix import matrix_inverse, smallest_singular
 from library.utils.flow import make_coordinate_grid
 from library.utils.matrix import make_symetric_matrix
 
 
 def find_best_frame(source, driving, cpu=False):
-    import library.third_partys.face_alignment
+    import library.third_partys.face_alignment as face_alignment
 
+    def local_normalize_kp(kp):
+        kp = kp - kp.mean(axis=0, keepdims=True)
+        area = ConvexHull(kp[:, :2]).volume
+        area = np.sqrt(area)
+        kp[:, :2] = kp[:, :2] / area
+        return kp
+
+    fa = face_alignment.FaceAlignment(face_alignment.LandmarksType._2D, flip_input=True,
+                                      device='cpu' if cpu else 'cuda')
+    kp_source = fa.get_landmarks_from_image(255 * source)[0]
+    kp_source = local_normalize_kp(kp_source)
+
+    diff = float('inf')
+    frame_num = 0
+    for i, img in tqdm(enumerate(driving)):
+        kp_driving = fa.get_landmarks(255 * img)[0]
+        kp_driving = local_normalize_kp(kp_driving)
+        new_diff = (np.abs(kp_source - kp_driving)**2).sum()
+
+        if new_diff < diff:
+            diff = new_diff
+            frame_num = i
+
+    return frame_num
 
 
 def cat_dict(data, dim):
