@@ -24,18 +24,18 @@ class KPDetector(nn.Module):
         self.scale_factor = scale_factor
         self.clip_variance = clip_variance
 
-    def forward(self, x):  # x shape: (N, 3, 1, H, W)
+    def forward(self, x):  # x shape: (N, 3, n, H, W)
         if self.scale_factor != 1:
             x = F.interpolate(x, scale_factor=(1, self.scale_factor, self.scale_factor), recompute_scale_factor=False)
 
-        heatmap = self.predictor(x)     # [N, kp, 1, h, w]
-        final_shape = heatmap.shape     # [N, kp, 1, h, w]
-        heatmap = heatmap.view(final_shape[0], final_shape[1], final_shape[2], -1)  # [N, kp, 1, h*w]
-        heatmap = F.softmax(heatmap / self.temperature, dim=3)                      # [N, kp, 1, H/2*W/2]
-        heatmap = heatmap.view(*final_shape)                                        # [N, kp, 1, H/2, W/2]
+        heatmap = self.predictor(x)     # [N, kp, n, h, w]
+        final_shape = heatmap.shape     # [N, kp, n, h, w]
+        heatmap = heatmap.view(final_shape[0], final_shape[1], final_shape[2], -1)  # [N, kp, n, h*w]
+        heatmap = F.softmax(heatmap / self.temperature, dim=3)                      # [N, kp, n, H/2*W/2]
+        heatmap = heatmap.view(*final_shape)                                        # [N, kp, n, H/2, W/2]
         out = gaussian2kp(heatmap, self.kp_variance, self.clip_variance)
-        # out   - mean:     (N, 1, mnum_kp, 2)
-        #       - var:      (N, 1, num_kp, 2, 2)
+        # out   - mean:     (N, n, mnum_kp, 2)
+        #       - var:      (N, n, num_kp, 2, 2)
 
         return out
 

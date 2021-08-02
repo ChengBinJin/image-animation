@@ -19,7 +19,7 @@ from library.utils.files import get_name
 from library.dataset.frames_dataset import FramesDataset
 from library.pipeline.train import train
 from library.pipeline.reconstruction import reconstruction
-# from library.pipeline.transfer import transfer
+from library.pipeline.animate import animate
 # from library.pipeline.prediction import prediction
 
 
@@ -28,9 +28,9 @@ if __name__ == "__main__":
     # parser.add_argument("--config", required=True, help="path to config")
     parser.add_argument("--config", default='/workspace/nas-data/Codes/H0088_image-animation/config/monkeynet/moving-gif.yaml', help="path to config")
     # parser.add_argument("--config", default='config/monkeynet/moving-gif.yaml', help="path to config")
-    parser.add_argument("--mode", default="train", choices=["train", "reconstruction", "transfer", "prediction"])
+    parser.add_argument("--mode", default="animate", choices=["train", "reconstruction", "animate", "prediction"])
     parser.add_argument("--log_dir", default="logs/monkeynet", help="path to log into")
-    parser.add_argument("--checkpoint", default=None, help="path to checkpoint to restore")
+    parser.add_argument("--checkpoint", default="/workspace/nas-data/Codes/H0088_image-animation/logs/monkeynet/moving-gif_2021-07-22_11:36:42/00149-checkpoint.pth.tar", help="path to checkpoint to restore")
     parser.add_argument("--device_ids", default="0", type=lambda x: list(map(int, x.split(','))),
                         help="Names of the devices comma separated")
     parser.add_argument("--verbose", dest="verbose", action="store_true", help="Print model architecture")
@@ -42,7 +42,7 @@ if __name__ == "__main__":
         assert len(config['train_params']['loss_weights']['feature_matching']) == blocks_discriminator + 1
 
     if opt.checkpoint is not None:
-        log_dir = os.path.join(project_dir, opt.log_dir, get_name(opt.checkpoint))
+        log_dir = os.path.dirname(opt.checkpoint)
     else:
         log_dir = os.path.join(project_dir, opt.log_dir,
                                get_name(opt.config) + datetime.now().strftime("_%Y-%m-%d_%H:%M:%S"))
@@ -73,17 +73,15 @@ if __name__ == "__main__":
 
     if opt.mode == 'train':
         print("Training...")
-        train(config, generator, discriminator, kp_detector, opt.checkpoint, log_dir, dataset, opt.device_ids)
+        train(config, kp_detector, generator, discriminator, opt.checkpoint, log_dir, dataset, opt.device_ids)
     elif opt.mode == 'reconstruction':
         print("Reconstruction...")
-        reconstruction(config, generator, kp_detector, opt.checkpoint, log_dir, dataset)
-    # elif opt.mode == "transfer":
-    #     print("Transfer...")
-    #     transfer(config, generator, kp_detector, opt.checkpoint, log_dir, dataset)
+        reconstruction(config, kp_detector, generator, opt.checkpoint, log_dir, dataset)
+    elif opt.mode == "animate":
+        print("Animate...")
+        animate(config, kp_detector, generator, opt.checkpoint, log_dir, dataset)
     # elif opt.mode == 'prediction':
     #     print("Prediction...")
     #     prediction(config, generator, kp_detector, opt.checkpoint, log_dir)
-    # else:
-    #     raise ValueError(' [!] Mode should be one of the [train, reconstruction, transfer, prediciton]!')
-
-    print("SUCCESS")
+    else:
+        raise ValueError(' [!] Mode should be one of the [train, reconstruction, transfer, prediciton]!')

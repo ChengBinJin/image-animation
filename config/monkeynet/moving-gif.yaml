@@ -65,7 +65,7 @@ train_params:
   num_epochs: 150  # 750
   epoch_milestones: [500]
   lr: 2.0e-4
-  batch_size: 2  # 32 for one gpu, 8 for debug
+  batch_size: 8  # 32 for one gpu, 8 for debug
   loss_weights:
     feature_matching: [10, 10, 10, 10, 1]
     reconstruction: 0
@@ -79,11 +79,14 @@ reconstruction_params:
   num_videos: null
   format: '.gif'
 
-transfer_params:
+animate_params:
   num_pairs: 100
   format: '.gif'
   normalization_params:
-    move_location: False
+    move_location: False    # Absolute or relative transfer (False - for absolute)
+    movement_mul: False     # Divide movement by the scale of object
+    adapt_variance: False   # Addapting the covariance matrix for relative transfer
+    clip_mean:  False       # Cliping the mean to be inside the image
 
 prediction_params:
   rnn_params:

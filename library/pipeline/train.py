@@ -13,7 +13,7 @@ from library.utils.loss import generator_loss_names, discriminator_loss_names
 from library.dataset.augmentation import worker_init_fn
 
 
-def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, dataset, device_ids):
+def train(config, kp_detector, generator, discriminator, checkpoint, log_dir, dataset, device_ids):
     train_params = config['train_params']
     initial_seed = int(time.time())
 
@@ -22,8 +22,8 @@ def train(config, generator, discriminator, kp_detector, checkpoint, log_dir, da
     optimizer_kp_detector = torch.optim.Adam(kp_detector.parameters(), lr=train_params['lr'], betas=(0.5, 0.999))
 
     if checkpoint is not None:
-        start_epoch, it = Logger.load_cpk(checkpoint, generator, discriminator, kp_detector,
-                                          optimizer_generator, optimizer_discriminator, optimizer_kp_detector)
+        start_epoch, it = Logger.load_cpk(checkpoint, kp_detector, generator, discriminator, optimizer_kp_detector,
+                                          optimizer_generator, optimizer_discriminator)
     else:
         start_epoch, it = 0, 0
 

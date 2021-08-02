@@ -7,6 +7,15 @@ from library.utils.flow import make_coordinate_grid
 from library.utils.matrix import make_symetric_matrix
 
 
+def find_best_frame(source, driving, cpu=False):
+    import library.third_partys.face_alignment
+
+
+
+def cat_dict(data, dim):
+    return {k: torch.cat([v[k] for v in data], dim=dim) for k in data[0]}
+
+
 def kp2gaussian(kp, spatial_size, kp_variance='matrix'):
     """
     Transform a keypoint into gaussian like representation
@@ -81,23 +90,24 @@ def gaussian2kp(heatmap, kp_variance='matrix', clip_variance=None):
     return kp
 
 
-def normalize_kp(kp_video, kp_appearance, movement_mult=False, move_location=False, adapt_variance=False,
+def normalize_kp(kp_source, kp_driving, movement_mult=False, move_location=False, adapt_variance=False,
                  clip_mean=False):
+    # normliaze_kp used in MonKeyNet
     if movement_mult:
-        appearance_area = ConvexHull(kp_appearance['mean'][0, 0].data.cpu().numpy()).volume
-        video_area = ConvexHull(kp_video['mean'][0, 0].data.cpu().numpy()).volume
+        appearance_area = ConvexHull(kp_source['mean'][0, 0].data.cpu().numpy()).volume
+        video_area = ConvexHull(kp_driving['mean'][0, 0].data.cpu().numpy()).volume
         movement_mult = np.sqrt(appearance_area) / np.sqrt(video_area)
     else:
         movement_mult = 1
 
-    kp_video = {k: v for k, v in kp_video.items()}
+    kp_video = {k: v for k, v in kp_driving.items()}
 
     if move_location:
         kp_video_diff = (kp_video['mean'] - kp_video['mean'][:, 0:1])
         kp_video_diff *= movement_mult
-        kp_video['mean'] = kp_video_diff + kp_appearance['mean']
+        kp_video['mean'] = kp_video_diff + kp_source['mean']
 
-    if move_location and clip_mean:
+    if clip_mean:
         one = torch.ones(1).type(kp_video_diff.type())
         kp_video['mean'] = torch.max(kp_video['mean'], -one)
         kp_video['mean'] = torch.min(kp_video['mean'], one)
@@ -107,12 +117,34 @@ def normalize_kp(kp_video, kp_appearance, movement_mult=False, move_location=Fal
         kp_var, _ = torch.solve(var_first, kp_video['var'])
 
         kp_var = torch.matmul(kp_video['var'], matrix_inverse(kp_video['var'][:, 0:1], eps=0))
-        kp_var = torch.matmul(kp_var, kp_appearance['var'])
+        kp_var = torch.matmul(kp_var, kp_source['var'])
 
         kp_var = make_symetric_matrix(kp_var)
         kp_video['var'] = kp_var
 
     return kp_video
+
+
+def normalize_kp2(kp_source, kp_driving, kp_driving_initial, adapt_movement_scale=False, use_relative_movement=False,
+                  use_realtive_jacobian=False):
+    # normalize_kp2 used in FOMM
+    if adapt_movement_scale:
+        source_area = ConvexHull(kp_source['value'][0].data.cpu().numpy()).volume
+        driving_area = ConvexHull(kp_driving_initial['value'][0].data.cpu().numpy()).volume
+        adapt_movement_scale = np.sqrt(source_area) / np.sqrt(driving_area)
+
+    kp_new = {k: v for k, v in kp_driving.items()}
+
+    if use_relative_movement:
+        kp_value_diff = (kp_driving['value'] - kp_driving_initial['value'])
+        kp_value_diff *= adapt_movement_scale
+        kp_new['value'] = kp_value_diff + kp_source['value']
+
+        if use_realtive_jacobian:
+            jacobian_diff = torch.matmul(kp_driving['jacobian'], torch.inverse(kp_driving_initial['jacobian']))
+            kp_new['jacobian'] = torch.matmul(jacobian_diff, kp_source['jacobian'])
+
+    return kp_new
 
 
 def split_kp(kp_joined, detach=False):
