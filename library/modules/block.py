@@ -71,9 +71,24 @@ class Decoder(nn.Module):
             return out
 
 
+class Hourglass2(nn.Module):
+    """
+    Hourglass architecture.
+    """
+
+    def __init__(self, block_expansion, in_features, num_blocks=3, max_features=256):
+        super(Hourglass2, self).__init__()
+        self.encoder = Encoder2(block_expansion, in_features, num_blocks, max_features)
+        self.decoder = Decoder2(block_expansion, in_features, num_blocks, max_features)
+        self.out_filters = self.decoder.out_filters
+
+    def forward(self, x):
+        return self.decoder(self.encoder(x))
+
+
 class Hourglass(nn.Module):
     """
-    Hourglass architecture
+    Hourglass architecture。
     """
 
     def __init__(self, block_expansion, in_features, out_features, num_blocks=3, max_features=256, temporal=False):

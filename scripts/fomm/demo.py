@@ -8,15 +8,16 @@ from skimage import img_as_ubyte
 from tqdm import tqdm
 
 from library.third_partys.sync_batchnorm import DataParallelWithCallback
-from library.utils.keypoint import normalize_kp2
+from library.utils.keypoint import normalize_kp2, find_best_frame
+from library.modules.keypoint_detector import KPDetector2
 
 
 def load_checkpoints(config_path, checkpoint_path):
     with open(config_path) as f:
         config = yaml.load(f, Loader=yaml.FullLoader)
 
-    kp_detector = KPDetector(**config['model_params']['kp_detector_params'],
-                             **config['model_params']['common_params'])
+    kp_detector = KPDetector2(**config['model_params']['kp_detector_params'],
+                              **config['model_params']['common_params'])
     generator = OcclusionAwareGenerator(**config['model_params']['generator_params'],
                                         **config['model_params']['common_params'])
     if torch.cuda.is_available():
