@@ -3,6 +3,29 @@ import torch.nn.functional as F
 from torch import nn
 
 from library.third_partys.sync_batchnorm import SynchronizedBatchNorm3d as BatchNorm3d
+from library.third_partys.sync_batchnorm import SynchronizedBatchNorm2d as BatchNorm2d
+
+
+class Encoder2(nn.Module):
+    """
+    Hourglass Encoder
+    """
+
+    def __init__(self, block_expansion, in_features, num_blocks=3, max_features=256):
+        super(Encoder2, self).__init__()
+
+        down_blocks = []
+        for i in range(num_blocks):
+            down_blocks.append(DownBlock2D(in_features if i==0 else min(max_features, block_expansion * (2 ** i)),
+                                           min(max_features, block_expansion * (2 ** (i + 1))), kernel_size=3,
+                                           padding=1))
+        self.down_blocks = nn.ModuleList(down_blocks)
+
+    def forward(self, x):
+        outs = [x]
+        for down_block in self.down_blocks:
+            outs.append(down_block(outs[-1]))
+        return outs
 
 
 class Encoder(nn.Module):
@@ -144,6 +167,28 @@ class DownBlock3DDis(nn.Module):
         if self.norm:
             out = self.norm(out)
         out = F.leaky_relu(out)
+        out = self.pool(out)
+        return out
+
+
+class DownBlock2D(nn.Module):
+    """
+    Downsampling block for use in encoder.
+    """
+
+    def __init__(self, in_features, out_features, kernel_size=3, padding=1, groups=1):
+        super(DownBlock2D, self).__init__()
+
+        self.conv = nn.Conv2d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
+                              padding=padding, groups=groups)
+        self.norm = BatchNorm2d(out_features, affine=True)
+        self.activate = nn.ReLU()
+        self.pool = nn.AvgPool2d(kernel_size=(2, 2))
+
+    def forward(self, x):
+        out = self.conv(x)
+        out = self.nom(out)
+        out = self.activate(out)
         out = self.pool(out)
         return out
 
