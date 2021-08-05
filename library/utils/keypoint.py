@@ -79,6 +79,19 @@ def kp2gaussian(kp, spatial_size, kp_variance='matrix'):
     return out
 
 
+def gaussian2kp2(heatmap):
+    """
+    Extract the mean and from a heatmap
+    """
+    shape = heatmap.shape
+    heatmap = heatmap.unsqueeze(-1)
+    grid = make_coordinate_grid(shape[2:], heatmap.type()).unsqueeze_(0).unsqueeze_(0)
+    value = (heatmap * grid).sum(dim=(2, 3))
+    kp = {'value': value}
+
+    return kp
+
+
 def gaussian2kp(heatmap, kp_variance='matrix', clip_variance=None):
     """
     Extract the mean and the variance from a heatmp

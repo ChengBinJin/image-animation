@@ -2,10 +2,10 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from library.modules.block import Hourglass, Hourglass2
+from library.modules.block import Hourglass, Hourglass2, AntiAliasInterpolation2d
 # from library.utils.matrix import matrix_inverse, smallest_singular
 # from library.utils.flow import make_coordinate_grid
-from library.utils.keypoint import gaussian2kp
+from library.utils.keypoint import gaussian2kp, gaussian2kp2
 
 
 class KPDetector2(nn.Module):

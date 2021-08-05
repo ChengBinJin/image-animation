@@ -16,7 +16,7 @@ class Encoder2(nn.Module):
 
         down_blocks = []
         for i in range(num_blocks):
-            down_blocks.append(DownBlock2D(in_features if i==0 else min(max_features, block_expansion * (2 ** i)),
+            down_blocks.append(DownBlock2d(in_features if i==0 else min(max_features, block_expansion * (2 ** i)),
                                            min(max_features, block_expansion * (2 ** (i + 1))), kernel_size=3,
                                            padding=1))
         self.down_blocks = nn.ModuleList(down_blocks)
@@ -40,7 +40,7 @@ class Decoder2(nn.Module):
         for i in range(num_blocks)[::-1]:
             in_filters = (1 if i == num_blocks - 1 else 2) * min(max_features, block_expansion * (2 ** (i + 1)))
             out_filters = min(max_features, block_expansion * (2 ** i))
-            up_blocks.append(UpBlock2D(in_filters, out_filters, kernel_size=3, padding=1))
+            up_blocks.append(UpBlock2d(in_filters, out_filters, kernel_size=3, padding=1))
         self.up_blocks = nn.ModuleList(up_blocks)
         self.out_filters = block_expansion + in_features
 
@@ -67,7 +67,7 @@ class Encoder(nn.Module):
         padding = (1, 1, 1) if temporal else (0, 1, 1)
         for i in range(num_blocks):
             down_blocks.append(
-                DownBlock3DGen(in_features=in_features if i == 0 else min(max_features, block_expansion * (2**i)),
+                DownBlock3dGen(in_features=in_features if i == 0 else min(max_features, block_expansion * (2**i)),
                                out_features=min(max_features, block_expansion * (2 ** (i+1))),
                                kernel_size=kernel_size, padding=padding))
         self.down_blocks = nn.ModuleList(down_blocks)
@@ -94,7 +94,7 @@ class Decoder(nn.Module):
 
         up_blocks = []
         for i in range(num_blocks)[::-1]:
-            up_blocks.append(UpBlock3D(
+            up_blocks.append(UpBlock3d(
                 in_features=(1 if i == num_blocks - 1 else 2) * min(
                     max_features, block_expansion * (2 ** (i + 1))) + additional_features_for_block,
                 out_features=min(max_features, block_expansion * (2 ** i)),
@@ -150,13 +150,13 @@ class Hourglass(nn.Module):
         return out
 
 
-class DownBlock3DGen(nn.Module):
+class DownBlock3dGen(nn.Module):
     """
     Simple block for processing video (encoder)
     """
 
     def __init__(self, in_features, out_features, kernel_size=3, padding=1):
-        super(DownBlock3DGen, self).__init__()
+        super(DownBlock3dGen, self).__init__()
         self.conv = nn.Conv3d(
             in_channels=in_features, out_channels=out_features, kernel_size=kernel_size, padding=padding)
         self.norm = BatchNorm3d(out_features, affine=True)
@@ -171,13 +171,13 @@ class DownBlock3DGen(nn.Module):
         return out
 
 
-class DownBlock3DDis(nn.Module):
+class DownBlock3dDis(nn.Module):
     """
     Simple block for processing video (encoder).
     """
 
     def __init__(self, in_features, out_features, norm=False, kernel_size=4):
-        super(DownBlock3DDis, self).__init__()
+        super(DownBlock3dDis, self).__init__()
         self.conv = nn.Conv3d(
             in_channels=in_features, out_channels=out_features, kernel_size=(1, kernel_size, kernel_size))
         if norm:
@@ -196,13 +196,13 @@ class DownBlock3DDis(nn.Module):
         return out
 
 
-class UpBlock3D(nn.Module):
+class UpBlock3d(nn.Module):
     """
     Simple block for processing video (decoder).
     """
 
     def __init__(self, in_features, out_features, kernel_size=3, padding=1):
-        super(UpBlock3D, self).__init__()
+        super(UpBlock3d, self).__init__()
 
         self.conv = nn.Conv3d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
                               padding=padding)
@@ -216,13 +216,13 @@ class UpBlock3D(nn.Module):
         return out
 
 
-class DownBlock2D(nn.Module):
+class DownBlock2d(nn.Module):
     """
     Downsampling block for use in encoder.
     """
 
     def __init__(self, in_features, out_features, kernel_size=3, padding=1, groups=1):
-        super(DownBlock2D, self).__init__()
+        super(DownBlock2d, self).__init__()
 
         self.conv = nn.Conv2d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
                               padding=padding, groups=groups)
@@ -238,13 +238,13 @@ class DownBlock2D(nn.Module):
         return out
 
 
-class UpBlock2D(nn.Module):
+class UpBlock2d(nn.Module):
     """
     Upsampling block for use in decoder.
     """
 
     def __init__(self, in_features, out_features, kernel_size=3, padding=1, groups=1):
-        super(UpBlock2D, self).__init__()
+        super(UpBlock2d, self).__init__()
 
         self.conv = nn.Conv2d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
                               padding=padding, groups=groups)
@@ -259,13 +259,13 @@ class UpBlock2D(nn.Module):
         return out
 
 
-class SameBlock3D(nn.Module):
+class SameBlock3d(nn.Module):
     """
     Simple block with group convoluiton
     """
 
     def __init__(self, in_features, out_features, groups=None, kernel_size=3, padding=1):
-        super(SameBlock3D, self).__init__()
+        super(SameBlock3d, self).__init__()
 
         self.conv = nn.Conv3d(
             in_channels=in_features, out_channels=out_features, kernel_size=kernel_size, padding=padding, groups=groups)
@@ -279,13 +279,13 @@ class SameBlock3D(nn.Module):
         return out
 
 
-class ResBlock3D(nn.Module):
+class ResBlock3d(nn.Module):
     """
     Res block, preserve spatial resolution.
     """
 
     def __init__(self, in_features, kernel_size, padding):
-        super(ResBlock3D, self).__init__()
+        super(ResBlock3d, self).__init__()
         self.conv1 = nn.Conv3d(
             in_channels=in_features, out_channels=in_features, kernel_size=kernel_size, padding=padding)
         self.conv2 = nn.Conv3d(
@@ -306,4 +306,47 @@ class ResBlock3D(nn.Module):
         return out
 
 
+class AntiAliasInterpolation2d(nn.Module):
+    """
+    Band-limited downsampling, for better preservation of the input signal.
+    """
+
+    def __init__(self, channels, scale):
+        super(AntiAliasInterpolation2d, self).__init__()
+        sigma = (1 / scale - 1) / 2
+        kernel_size = 2 * round(sigma * 4) + 1
+        self.ka = kernel_size // 2
+        self.kb = self.ka - 1 if kernel_size % 2 == 0 else self.ka
+
+        kernel_size = [kernel_size, kernel_size]
+        sigma = [sigma, sigma]
+        # The gaussian kernel is the product of the gaussian function of each dimension.
+        kernel = torch.tensor(1)
+        meshgrids = torch.meshgrid([torch.arange(size, dtype=torch.float32) for size in kernel_size])
+
+        for size, std, mgrid in zip(kernel_size, sigma, meshgrids):
+            mean = (size - 1) / 2
+            kernel *= torch.exp(-(mgrid - mean) ** 2 / (2 * std ** 2))
+
+        # Make sure sum of values in gaussian kernel equls 1.
+        kernel = kernel / torch.sum(kernel)
+        # Reshape to depthwise convolutional weight
+        kernel = kernel.view(1, 1, *kernel.size())
+        kernel = kernel.repeat(channels, *[1] * (kernel.dim() - 1))
+
+        self.register_buffer('weight', kernel)
+        self.groups = channels
+        self.scale = scale
+        inv_scale = 1 / scale
+        self.int_inv_scale = int(inv_scale)
+
+    def forward(self, x):
+        if self.scale == 1.0:
+            return x
+
+        out = F.pad(x, (self.ka, self.kb, self.ka, self.kb))
+        out = F.conv2d(out, weight=self.weight, groups=self.groups)
+        out = out[:, :, ::self.int_inv_scale, ::self.int_inv_scale]
+
+        return out
 
