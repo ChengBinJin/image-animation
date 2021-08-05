@@ -8,7 +8,7 @@ from library.third_partys.sync_batchnorm import SynchronizedBatchNorm2d as Batch
 
 class Encoder2(nn.Module):
     """
-    Hourglass Encoder
+    Hourglass2 Encoder
     """
 
     def __init__(self, block_expansion, in_features, num_blocks=3, max_features=256):
@@ -26,6 +26,31 @@ class Encoder2(nn.Module):
         for down_block in self.down_blocks:
             outs.append(down_block(outs[-1]))
         return outs
+
+
+class Decoder2(nn.Module):
+    """
+    Hourglass2 Decoder
+    """
+
+    def __init__(self, block_expansion, in_features, num_blocks=3, max_features=256):
+        super(Decoder2, self).__init__()
+
+        up_blocks = []
+        for i in range(num_blocks)[::-1]:
+            in_filters = (1 if i == num_blocks - 1 else 2) * min(max_features, block_expansion * (2 ** (i + 1)))
+            out_filters = min(max_features, block_expansion * (2 ** i))
+            up_blocks.append(UpBlock2D(in_filters, out_filters, kernel_size=3, padding=1))
+        self.up_blocks = nn.ModuleList(up_blocks)
+        self.out_filters = block_expansion + in_features
+
+    def forward(self, x):
+        out = x.pop()
+        for up_block in self.up_blocks:
+            out = up_block(out)
+            skip = x.pop()
+            out = torch.cat([out, skip], dim=1)
+        return out
 
 
 class Encoder(nn.Module):
@@ -171,6 +196,26 @@ class DownBlock3DDis(nn.Module):
         return out
 
 
+class UpBlock3D(nn.Module):
+    """
+    Simple block for processing video (decoder).
+    """
+
+    def __init__(self, in_features, out_features, kernel_size=3, padding=1):
+        super(UpBlock3D, self).__init__()
+
+        self.conv = nn.Conv3d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
+                              padding=padding)
+        self.norm = BatchNorm3d(out_features, affine=True)
+
+    def forward(self, x):
+        out = F.interpolate(x, scale_factor=(1, 2, 2), recompute_scale_factor=True)
+        out = self.conv(out)
+        out = self.norm(out)
+        out = F.relu(out)
+        return out
+
+
 class DownBlock2D(nn.Module):
     """
     Downsampling block for use in encoder.
@@ -193,23 +238,24 @@ class DownBlock2D(nn.Module):
         return out
 
 
-class UpBlock3D(nn.Module):
+class UpBlock2D(nn.Module):
     """
-    Simple block for processing video (decoder).
+    Upsampling block for use in decoder.
     """
 
-    def __init__(self, in_features, out_features, kernel_size=3, padding=1):
-        super(UpBlock3D, self).__init__()
+    def __init__(self, in_features, out_features, kernel_size=3, padding=1, groups=1):
+        super(UpBlock2D, self).__init__()
 
-        self.conv = nn.Conv3d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
-                              padding=padding)
-        self.norm = BatchNorm3d(out_features, affine=True)
+        self.conv = nn.Conv2d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
+                              padding=padding, groups=groups)
+        self.norm = BatchNorm2d(out_features, affine=True)
+        self.activate = nn.ReLU()
 
     def forward(self, x):
-        out = F.interpolate(x, scale_factor=(1, 2, 2), recompute_scale_factor=True)
+        out = F.interpolate(x, scale_factor=2)
         out = self.conv(out)
         out = self.norm(out)
-        out = F.relu(out)
+        out = self.activate(out)
         return out
 
 
