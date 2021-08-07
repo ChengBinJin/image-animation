@@ -150,6 +150,28 @@ class Hourglass(nn.Module):
         return out
 
 
+class DownBlock2d(nn.Module):
+    """
+    Downsampling block for use in encoder.
+    """
+
+    def __init__(self, in_features, out_features, kernel_size=3, padding=1, groups=1):
+        super(DownBlock2d, self).__init__()
+
+        self.conv = nn.Conv2d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
+                              padding=padding, groups=groups)
+        self.norm = BatchNorm2d(out_features, affine=True)
+        self.activate = nn.ReLU()
+        self.pool = nn.AvgPool2d(kernel_size=(2, 2))
+
+    def forward(self, x):
+        out = self.conv(x)
+        out = self.nom(out)
+        out = self.activate(out)
+        out = self.pool(out)
+        return out
+
+
 class DownBlock3dGen(nn.Module):
     """
     Simple block for processing video (encoder)
@@ -196,48 +218,6 @@ class DownBlock3dDis(nn.Module):
         return out
 
 
-class UpBlock3d(nn.Module):
-    """
-    Simple block for processing video (decoder).
-    """
-
-    def __init__(self, in_features, out_features, kernel_size=3, padding=1):
-        super(UpBlock3d, self).__init__()
-
-        self.conv = nn.Conv3d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
-                              padding=padding)
-        self.norm = BatchNorm3d(out_features, affine=True)
-
-    def forward(self, x):
-        out = F.interpolate(x, scale_factor=(1, 2, 2), recompute_scale_factor=True)
-        out = self.conv(out)
-        out = self.norm(out)
-        out = F.relu(out)
-        return out
-
-
-class DownBlock2d(nn.Module):
-    """
-    Downsampling block for use in encoder.
-    """
-
-    def __init__(self, in_features, out_features, kernel_size=3, padding=1, groups=1):
-        super(DownBlock2d, self).__init__()
-
-        self.conv = nn.Conv2d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
-                              padding=padding, groups=groups)
-        self.norm = BatchNorm2d(out_features, affine=True)
-        self.activate = nn.ReLU()
-        self.pool = nn.AvgPool2d(kernel_size=(2, 2))
-
-    def forward(self, x):
-        out = self.conv(x)
-        out = self.nom(out)
-        out = self.activate(out)
-        out = self.pool(out)
-        return out
-
-
 class UpBlock2d(nn.Module):
     """
     Upsampling block for use in decoder.
@@ -256,6 +236,26 @@ class UpBlock2d(nn.Module):
         out = self.conv(out)
         out = self.norm(out)
         out = self.activate(out)
+        return out
+
+
+class UpBlock3d(nn.Module):
+    """
+    Simple block for processing video (decoder).
+    """
+
+    def __init__(self, in_features, out_features, kernel_size=3, padding=1):
+        super(UpBlock3d, self).__init__()
+
+        self.conv = nn.Conv3d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
+                              padding=padding)
+        self.norm = BatchNorm3d(out_features, affine=True)
+
+    def forward(self, x):
+        out = F.interpolate(x, scale_factor=(1, 2, 2), recompute_scale_factor=True)
+        out = self.conv(out)
+        out = self.norm(out)
+        out = F.relu(out)
         return out
 
 
@@ -296,6 +296,34 @@ class SameBlock3d(nn.Module):
         out = self.norm(out)
         out = self.activate(out)
 
+        return out
+
+
+class ResBlock2d(nn.Module):
+    """
+    Res block, preserve spatial resolution.
+    """
+
+    def __init__(self, in_features, kernel_size, padding):
+        super(ResBlock2d, self).__init__()
+
+        self.conv1 = nn.Conv2d(in_channels=in_features, out_channels=in_features, kernel_size=kernel_size,
+                               padding=padding)
+        self.conv2 = nn.Conv2d(in_channels=in_features, out_channels=in_features, kernel_size=kernel_size,
+                               padding=padding)
+        self.norm1 = BatchNorm2d(in_features, affine=True)
+        self.norm2 = BatchNorm2d(in_features, affine=True)
+        self.activate1 = nn.ReLU()
+        self.activate2 = nn.ReLU()
+
+    def forward(self, x):
+        out = self.norm1(x)
+        out = self.activate1(out)
+        out = self.conv1(out)
+        out = self.norm2(out)
+        out = self.activate2(out)
+        out = self.conv2(out)
+        out += x
         return out
 
 

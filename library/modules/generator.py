@@ -3,7 +3,7 @@ import torch.nn.functional as F
 from torch import nn
 
 from library.modules.dense_motion import MovementEmbeddingModule, DenseMotionModule, IdentityDeformation
-from library.modules.block import Encoder, Decoder, ResBlock3d, SameBlock2d
+from library.modules.block import Encoder, Decoder, ResBlock3d, SameBlock2d, DownBlock2d, UpBlock2d, ResBlock2d
 
 
 class OcclusionAwareGenerator(nn.Module):
@@ -48,7 +48,57 @@ class OcclusionAwareGenerator(nn.Module):
         self.estimate_occlusion_map = estimate_occlusion_map
         self.num_channels = num_channels
 
+    @staticmethod
+    def deform_input(inp, deformation):
+        _, h_old, w_old, _ = deformation.shape
+        _, _, h, w = inp.shape
 
+        if h_old != h or w_old != w:
+            deformation = deformation.permute(0, 3, 1, 2)
+            deformation = F.interpolate(deformation, size=(h, w), mode='bilinear')
+            deformation = deformation.permute(0, 2, 3, 1)
+        return F.grid_sample(inp, deformation)
+
+    def forwad(self, source_image, kp_driving, kp_source):
+        # Encoding (downsampling) part
+        out = self.first(source_image)
+        for i in range(len(self.down_blocks)):
+            out = self.down_blocks[i](out)
+
+        # Transforming feature representation according to deformation and occlusion
+        output_dict = {}
+        if self.dense_motion_network is not None:
+            dense_motion = self.dense_motion_network(source_image=source_image, kp_driving=kp_driving,
+                                                     kp_source=kp_source)
+            output_dict['mask'] = dense_motion['mask']
+            output_dict['sparse_deformed'] = dense_motion['sparse_deformed']
+
+            if 'occlusion_map' in dense_motion:
+                occlusion_map = dense_motion['occlusion_map']
+                output_dict['occlusion_map'] = occlusion_map
+            else:
+                occlusion_map = None
+
+            deformation = dense_motion['deformation']
+            out = self.deform_input(out, deformation)
+
+            if occlusion_map is not None:
+                if out.shape[2] != occlusion_map.shape[2] or out.shape[3] != occlusion_map.shape[3]:
+                    occlusion_map = F.interpolate(occlusion_map, size=out.shape[2:], mode='bilinear')
+                out = out * occlusion_map
+
+            output_dict["deformed"] = self.deform_input(source_image, deformation)
+
+        # Decodign part
+        out = self.bottleneck(out)
+        for i in range(len(self.up_blocks)):
+            out = self.up_blocks[i](out)
+        out = self.final(out)
+        out = F.sigmoid(out)
+
+        output_dict["prediction"] = out
+
+        return output_dict
 
 
 class MotionTransferGenerator(nn.Module):
