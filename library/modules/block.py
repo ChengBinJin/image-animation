@@ -259,6 +259,25 @@ class UpBlock2d(nn.Module):
         return out
 
 
+class SameBlock2d(nn.Module):
+    """
+    Simple block, preserve spatial resolution.
+    """
+
+    def __init__(self, in_features, out_features, groups=1, kernel_size=3, padding=1):
+        super(SameBlock2d, self).__init__()
+        self.conv = nn.Conv2d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
+                              padding=padding, groups=groups)
+        self.nomr = BatchNorm2d(out_features, affine=True)
+        self.activate = nn.ReLU()
+
+    def forward(self, x):
+        out = self.conv(x)
+        out = self.norm(out)
+        out = self.activate(out)
+        return out
+
+
 class SameBlock3d(nn.Module):
     """
     Simple block with group convoluiton
@@ -270,11 +289,12 @@ class SameBlock3d(nn.Module):
         self.conv = nn.Conv3d(
             in_channels=in_features, out_channels=out_features, kernel_size=kernel_size, padding=padding, groups=groups)
         self.norm = BatchNorm3d(num_features=out_features, affine=True)
+        self.activate = nn.ReLU()
 
     def forward(self, x):
         out = self.conv(x)
         out = self.norm(out)
-        out = F.relu(out)
+        out = self.activate(out)
 
         return out
 

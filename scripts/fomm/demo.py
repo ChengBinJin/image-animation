@@ -10,6 +10,7 @@ from tqdm import tqdm
 from library.third_partys.sync_batchnorm import DataParallelWithCallback
 from library.utils.keypoint import normalize_kp2, find_best_frame
 from library.modules.keypoint_detector import KPDetector2
+from library.modules.generator import OcclusionAwareGenerator
 
 
 def load_checkpoints(config_path, checkpoint_path):

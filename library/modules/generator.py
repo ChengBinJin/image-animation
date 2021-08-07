@@ -2,8 +2,53 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from library.modules.block import Encoder, Decoder, ResBlock3D
 from library.modules.dense_motion import MovementEmbeddingModule, DenseMotionModule, IdentityDeformation
+from library.modules.block import Encoder, Decoder, ResBlock3d, SameBlock2d
+
+
+class OcclusionAwareGenerator(nn.Module):
+    """"
+    Generator that given source image and keypoints try to transform image according to movement trajectories induced by
+    keypoints. Generator follows Johnson architecture.
+    """
+
+    def __init__(self, num_channels, num_kp, block_expansion, max_features, num_down_blocks, num_bottleneck_blocks,
+                 estimate_occlusion_map=False, dense_motion_params=None, estimate_jacobian=False):
+        super(OcclusionAwareGenerator, self).__init__()
+
+        if dense_motion_params is not None:
+            self.dense_motion_network = DenseMotionNetwork(
+                num_kp=num_kp, num_channels=num_channels, estimate_occlusion_map=estimate_occlusion_map,
+                **dense_motion_params)
+        else:
+            self.dense_motion_network = None
+
+        self.first = SameBlock2d(num_channels, block_expansion, kernel_size=(7, 7), padding=(3, 3))
+
+        down_blocks = []
+        for i in range(num_down_blocks):
+            in_features = min(max_features, block_expansion * (2 ** i))
+            out_features = min(max_features, block_expansion * (2 ** (i + 1)))
+            down_blocks.append(DownBlock2d(in_features, out_features, kernel_size=(3, 3), padding=(1, 1)))
+        self.down_blocks = nn.ModuleList(down_blocks)
+
+        up_blocks = []
+        for i in range(num_down_blocks):
+            in_features = min(max_features, block_expansion * (2 ** (num_down_blocks - i)))
+            out_features = min(max_features, block_expansion * (2 ** (num_down_blocks - i - 1)))
+            up_blocks.append(UpBlock2d(in_features, out_features, kernel_size=(3, 3), padding=(1, 1)))
+        self.up_blocks = nn.ModuleList(up_blocks)
+
+        self.bottleneck = torch.nn.Sequential()
+        in_features = min(max_features, block_expansion * (2 ** num_down_blocks))
+        for i in range(num_bottleneck_blocks):
+            self.bottleneck.add_module('r' + str(i), ResBlock2d(in_features, kernel_size=(3, 3), padding=(1, 1)))
+
+        self.final = nn.Conv2d(block_expansion, num_channels, kernel_size=(7, 7), padding=(3, 3))
+        self.estimate_occlusion_map = estimate_occlusion_map
+        self.num_channels = num_channels
+
+
 
 
 class MotionTransferGenerator(nn.Module):
@@ -43,7 +88,7 @@ class MotionTransferGenerator(nn.Module):
         self.refinement_module = torch.nn.Sequential()
         for i in range(num_refinement_blocks):
             self.refinement_module.add_module(
-                'r' + str(i), ResBlock3D(in_features, kernel_size=(1, 3, 3), padding=(0, 1, 1)))
+                'r' + str(i), ResBlock3d(in_features, kernel_size=(1, 3, 3), padding=(0, 1, 1)))
         self.refinement_module.add_module(
             'conv-last', nn.Conv3d(in_channels=in_features, out_channels=num_channels, kernel_size=1, padding=0))
         self.interpolation_mode = interpolation_mode

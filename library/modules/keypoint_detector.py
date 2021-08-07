@@ -3,8 +3,6 @@ import torch.nn.functional as F
 from torch import nn
 
 from library.modules.block import Hourglass, Hourglass2, AntiAliasInterpolation2d
-# from library.utils.matrix import matrix_inverse, smallest_singular
-# from library.utils.flow import make_coordinate_grid
 from library.utils.keypoint import gaussian2kp, gaussian2kp2
 
 
@@ -36,6 +34,34 @@ class KPDetector2(nn.Module):
         self.scale_factor = scale_factor
         if self.scale_factor != 1:
             self.down = AntiAliasInterpolation2d(num_channels, self.scale_factor)
+
+    def forward(self, x):
+        if self.scale_factor != 1:
+            x = self.down(x)
+
+        feature_map = self.predictor(x)
+        prediction = self.kp(feature_map)
+
+        final_shape = prediction.shape
+        heatmap = prediction.view(final_shape[0], final_shape[1], -1)
+        heatmap = F.softmax(heatmap / self.temperature, dim=2)
+        heatmap = heatmap.view(*final_shape)
+
+        out = gaussian2kp2(heatmap)
+
+        if self.jacobian is not None:
+            jacobian_map = self.jacobian(feature_map)
+            jacobian_map = jacobian_map.reshape(
+                final_shape[0], self.num_jacobian_maps, 4, final_shape[2], final_shape[3])
+            heatmap = heatmap.unsqueeze(2)
+
+            jacobian = heatmap * jacobian_map
+            jacobian = jacobian.view(final_shape[0], final_shape[1], 4, -1)
+            jacobian = jacobian.sum(dim=-1)
+            jacobian = jacobian.view(jacobian.shape[0], jacobian.shape[1], 2, 2)
+            out['jacobian'] = jacobian
+
+        return out
 
 
 class KPDetector(nn.Module):
