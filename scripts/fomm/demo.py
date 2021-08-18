@@ -1,11 +1,16 @@
-import numpy as np
+import os
+import sys
 import yaml
 import imageio
 import torch
+import numpy as np
 from argparse import ArgumentParser
 from skimage.transform import resize
 from skimage import img_as_ubyte
 from tqdm import tqdm
+
+project_folder = os.path.dirname(os.path.dirname(os.path.dirname(__file__)))
+sys.path.append(project_folder)
 
 from library.third_partys.sync_batchnorm import DataParallelWithCallback
 from library.utils.keypoint import normalize_kp2, find_best_frame
@@ -21,6 +26,7 @@ def load_checkpoints(config_path, checkpoint_path):
                               **config['model_params']['common_params'])
     generator = OcclusionAwareGenerator(**config['model_params']['generator_params'],
                                         **config['model_params']['common_params'])
+
     if torch.cuda.is_available():
         kp_detector.cuda()
         generator.cuda()
@@ -31,7 +37,7 @@ def load_checkpoints(config_path, checkpoint_path):
         checkpoint = torch.load(checkpoint_path, map_location=torch.device('cpu'))
 
     kp_detector.load_state_dict(checkpoint['kp_detector'])
-    generator.load_state_dict([checkpoint['generator']])
+    generator.load_state_dict(checkpoint['generator'])
 
     if torch.cuda.is_available():
         kp_detector = DataParallelWithCallback(kp_detector)
@@ -40,6 +46,9 @@ def load_checkpoints(config_path, checkpoint_path):
     kp_detector.eval()
     generator.eval()
 
+    print(f'kp_detector:\n {kp_detector}')
+    print(f'generator:\n {generator}')
+
     return kp_detector, generator
 
 
@@ -47,25 +56,37 @@ def make_animation(source_img, driving_video, kp_detector, generator, relative=T
                    cpu=False):
     with torch.no_grad():
         predictions = []
-        source = torch.tensor(source_img[np.newaxis].astype(np.float32)).permute(0, 3, 1, 2)
+        source = torch.tensor(source_img[np.newaxis].astype(np.float32)).permute(0, 3, 1, 2)  # (N, 3, H, W)
         if not cpu:
             source = source.cuda()
 
         driving = torch.tensor(np.array(driving_video)[np.newaxis].astype(np.float32)).permute(0, 4, 1, 2, 3)
+        # driving shape: (N, 3, num_frames, H, W)
         kp_source = kp_detector(source)
+        # kp_source -   value:      (N, num_kp, 2)
+        #           -   jacobian:   (N, num_kp, 2, 2)
         kp_driving_initial = kp_detector(driving[:, :, 0])
 
         for frame_idx in tqdm(range(driving.shape[2])):
-            driving_frame = driving[:, :, frame_idx]
+            driving_frame = driving[:, :, frame_idx]  # (1, 3, H, W)
             if not cpu:
                 driving_frame = driving_frame.cuda()
 
             kp_driving = kp_detector(driving_frame)
+            # kp_driving    -   value:      (N, num_kp, 2)
+            #               -   jacobian:   (N, num_kp, 2, 2)
             kp_norm = normalize_kp2(kp_source=kp_source, kp_driving_initial=kp_driving_initial, kp_driving=kp_driving,
                                     use_relative_movement=relative, use_relative_jacobian=relative,
                                     adapt_movement_scale=adapt_movement_scale)
+            # kp_norm       -   value:      (N, num_kp, 2)
+            #               -   jacobian:   (N, num_kp, 2, 2)
             out = generator(source, kp_source=kp_source, kp_driving=kp_norm)
-            prediction_img = np.transpose(out['prediction'].data.cpu().numpy(), [0, 2, 3, 1])[0]
+            # out   -   mask:               (N, num_kp+1, 64, 64)
+            #       -   sparse_deformed:    (N, num_kp+1, 3, 64, 64)
+            #       -   occlusion_map:      (N, 1, 64, 64)
+            #       -   deformed:           (N, 3, 256, 256)
+            #       -   prediction:         (N, 3, 256, 256)
+            prediction_img = np.transpose(out['prediction'].data.cpu().numpy(), [0, 2, 3, 1])[0]  # (256, 256, 3)
             predictions.append(prediction_img)
 
     return predictions
@@ -73,13 +94,13 @@ def make_animation(source_img, driving_video, kp_detector, generator, relative=T
 
 if __name__ == "__main__":
     parser = ArgumentParser()
-    parser.add_argument("--config", required=True, help="path to config")
-    parser.add_argument("--checkpoint", default="vox-cpk.pth.tar", help="path to checkpoint to restore")
-    parser.add_argument("--source_image", default="sup-mat/source.png", help="path to source image")
-    parser.add_argument("--driving_video", default="sup-mat/source.png", help="path to driving video")
-    parser.add_argument("--result_video", default="result.mp4", help="path to output")
+    parser.add_argument("--config", default="/workspace/nas-data/Codes/H0088_image-animation/config/fomm/vox-adv-256.yaml", help="path to config")
+    parser.add_argument("--checkpoint", default="/workspace/nas-data/Codes/H0088_image-animation/checkpoints/fomm/vox-adv-cpk.pth.tar", help="path to checkpoint to restore")
+    parser.add_argument("--source_image", default="/workspace/nas-data/Codes/H0088_image-animation/sup-mat/MrKim.jpg", help="path to source image")
+    parser.add_argument("--driving_video", default="/workspace/nas-data/Codes/H0088_image-animation/sup-mat/applepen.MP4", help="path to driving video")
+    parser.add_argument("--result_video", default="/workspace/nas-data/Codes/H0088_image-animation/fomm_result.mp4", help="path to output")
 
-    parser.add_argument("--relative", dest="relative", action="store_ture",
+    parser.add_argument("--relative", dest="relative", action="store_true",
                         help="use relative or absolute keypoint coordinates")
     parser.add_argument("--adapt_scale", dest="adapt_scale", action="store_true",
                         help="adap movement scale based on convex hull of keypoints")

@@ -16,7 +16,7 @@ class Encoder2(nn.Module):
 
         down_blocks = []
         for i in range(num_blocks):
-            down_blocks.append(DownBlock2d(in_features if i==0 else min(max_features, block_expansion * (2 ** i)),
+            down_blocks.append(DownBlock2d(in_features if i == 0 else min(max_features, block_expansion * (2 ** i)),
                                            min(max_features, block_expansion * (2 ** (i + 1))), kernel_size=3,
                                            padding=1))
         self.down_blocks = nn.ModuleList(down_blocks)
@@ -24,7 +24,8 @@ class Encoder2(nn.Module):
     def forward(self, x):
         outs = [x]
         for down_block in self.down_blocks:
-            outs.append(down_block(outs[-1]))
+            out = down_block(outs[-1])
+            outs.append(out)
         return outs
 
 
@@ -131,7 +132,8 @@ class Hourglass2(nn.Module):
         self.out_filters = self.decoder.out_filters
 
     def forward(self, x):
-        return self.decoder(self.encoder(x))
+        out = self.decoder(self.encoder(x))  # (N, 64+44, h, w)
+        return out
 
 
 class Hourglass(nn.Module):
@@ -166,7 +168,7 @@ class DownBlock2d(nn.Module):
 
     def forward(self, x):
         out = self.conv(x)
-        out = self.nom(out)
+        out = self.norm(out)
         out = self.activate(out)
         out = self.pool(out)
         return out
@@ -268,7 +270,7 @@ class SameBlock2d(nn.Module):
         super(SameBlock2d, self).__init__()
         self.conv = nn.Conv2d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
                               padding=padding, groups=groups)
-        self.nomr = BatchNorm2d(out_features, affine=True)
+        self.norm = BatchNorm2d(out_features, affine=True)
         self.activate = nn.ReLU()
 
     def forward(self, x):
@@ -369,18 +371,18 @@ class AntiAliasInterpolation2d(nn.Module):
         kernel_size = [kernel_size, kernel_size]
         sigma = [sigma, sigma]
         # The gaussian kernel is the product of the gaussian function of each dimension.
-        kernel = torch.tensor(1)
+        kernel = 1
         meshgrids = torch.meshgrid([torch.arange(size, dtype=torch.float32) for size in kernel_size])
 
         for size, std, mgrid in zip(kernel_size, sigma, meshgrids):
             mean = (size - 1) / 2
-            kernel *= torch.exp(-(mgrid - mean) ** 2 / (2 * std ** 2))
+            kernel *= torch.exp(-(mgrid - mean) ** 2 / (2 * std ** 2))  # normal distribution
 
         # Make sure sum of values in gaussian kernel equls 1.
-        kernel = kernel / torch.sum(kernel)
+        kernel = kernel / torch.sum(kernel)  # (13, 13)
         # Reshape to depthwise convolutional weight
         kernel = kernel.view(1, 1, *kernel.size())
-        kernel = kernel.repeat(channels, *[1] * (kernel.dim() - 1))
+        kernel = kernel.repeat(channels, *[1] * (kernel.dim() - 1))  # (3, 1, 13, 13)
 
         self.register_buffer('weight', kernel)
         self.groups = channels

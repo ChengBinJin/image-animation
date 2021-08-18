@@ -6,11 +6,10 @@ from scipy.spatial import ConvexHull
 from library.utils.matrix import matrix_inverse, smallest_singular
 from library.utils.flow import make_coordinate_grid
 from library.utils.matrix import make_symetric_matrix
+import library.third_partys.face_alignment as face_alignment
 
 
 def find_best_frame(source, driving, cpu=False):
-    import library.third_partys.face_alignment as face_alignment
-
     def local_normalize_kp(kp):
         kp = kp - kp.mean(axis=0, keepdims=True)
         area = ConvexHull(kp[:, :2]).volume
@@ -79,14 +78,38 @@ def kp2gaussian(kp, spatial_size, kp_variance='matrix'):
     return out
 
 
+def kp2gaussian2(kp, spatial_size, kp_variance):
+    """
+    Transform a keypoint into gaussian like representataion
+    """
+    mean = kp['value']
+
+    coordinate_grid = make_coordinate_grid(spatial_size, mean.type())
+    number_of_leading_dimensions = len(mean.shape) - 1
+    shape = (1,) * number_of_leading_dimensions + coordinate_grid.shape
+    coordinate_grid = coordinate_grid.view(*shape)
+    repeats = mean.shape[:number_of_leading_dimensions] + (1, 1, 1)
+    coordinate_grid = coordinate_grid.repeat(*repeats)
+
+    # Preprocess kp shape
+    shape = mean.shape[:number_of_leading_dimensions] + (1, 1, 2)
+    mean = mean.view(*shape)
+
+    mean_sub = (coordinate_grid - mean)
+
+    out = torch.exp(-0.5 * (mean_sub ** 2).sum(-1) / kp_variance)
+
+    return out
+
+
 def gaussian2kp2(heatmap):
     """
     Extract the mean and from a heatmap
     """
-    shape = heatmap.shape
-    heatmap = heatmap.unsqueeze(-1)
-    grid = make_coordinate_grid(shape[2:], heatmap.type()).unsqueeze_(0).unsqueeze_(0)
-    value = (heatmap * grid).sum(dim=(2, 3))
+    shape = heatmap.shape  # (N, num_kp, 58, 58)
+    heatmap = heatmap.unsqueeze(-1)  # (N, num_kp, 58, 58, 1)
+    grid = make_coordinate_grid(shape[2:], heatmap.type()).unsqueeze_(0).unsqueeze_(0)  # (1, 1, 58, 58, 2)
+    value = (heatmap * grid).sum(dim=(2, 3))  # (N, num_kp, 2)
     kp = {'value': value}
 
     return kp
@@ -164,7 +187,7 @@ def normalize_kp(kp_source, kp_driving, movement_mult=False, move_location=False
 
 
 def normalize_kp2(kp_source, kp_driving, kp_driving_initial, adapt_movement_scale=False, use_relative_movement=False,
-                  use_realtive_jacobian=False):
+                  use_relative_jacobian=False):
     # normalize_kp2 used in FOMM
     if adapt_movement_scale:
         source_area = ConvexHull(kp_source['value'][0].data.cpu().numpy()).volume
@@ -174,12 +197,12 @@ def normalize_kp2(kp_source, kp_driving, kp_driving_initial, adapt_movement_scal
     kp_new = {k: v for k, v in kp_driving.items()}
 
     if use_relative_movement:
-        kp_value_diff = (kp_driving['value'] - kp_driving_initial['value'])
-        kp_value_diff *= adapt_movement_scale
-        kp_new['value'] = kp_value_diff + kp_source['value']
+        kp_value_diff = (kp_driving['value'] - kp_driving_initial['value'])  # (1, num_kp, 2)
+        kp_value_diff *= adapt_movement_scale  # (1, num_kp, 2)
+        kp_new['value'] = kp_value_diff + kp_source['value']  # (1, num_kp, 2)
 
-        if use_realtive_jacobian:
-            jacobian_diff = torch.matmul(kp_driving['jacobian'], torch.inverse(kp_driving_initial['jacobian']))
+        if use_relative_jacobian:
+            jacobian_diff = torch.matmul(kp_driving['jacobian'], torch.inverse(kp_driving_initial['jacobian']))  # (1, num_kp, 2, 2)
             kp_new['jacobian'] = torch.matmul(jacobian_diff, kp_source['jacobian'])
 
     return kp_new

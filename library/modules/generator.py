@@ -2,7 +2,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from library.modules.dense_motion import MovementEmbeddingModule, DenseMotionModule, IdentityDeformation
+from library.modules.dense_motion import MovementEmbeddingModule, DenseMotionModule, IdentityDeformation, \
+    DenseMotionNetwork
 from library.modules.block import Encoder, Decoder, ResBlock3d, SameBlock2d, DownBlock2d, UpBlock2d, ResBlock2d
 
 
@@ -59,9 +60,10 @@ class OcclusionAwareGenerator(nn.Module):
             deformation = deformation.permute(0, 2, 3, 1)
         return F.grid_sample(inp, deformation)
 
-    def forwad(self, source_image, kp_driving, kp_source):
+    def forward(self, source_image, kp_driving, kp_source):
         # Encoding (downsampling) part
-        out = self.first(source_image)
+        # source_image: (N, 3, H, W)
+        out = self.first(source_image)  # (N, 64, h, w)
         for i in range(len(self.down_blocks)):
             out = self.down_blocks[i](out)
 
@@ -70,6 +72,11 @@ class OcclusionAwareGenerator(nn.Module):
         if self.dense_motion_network is not None:
             dense_motion = self.dense_motion_network(source_image=source_image, kp_driving=kp_driving,
                                                      kp_source=kp_source)
+            # dense_motion  -   sparse_deformed:    (N, num_kp+1, 3, h, w)
+            #               -   mask                (N, num_kp+1, h, w)
+            #               -   deformation         (N, h, w, 2)
+            #               -   occlusion_map       (N, 1, h, w)
+
             output_dict['mask'] = dense_motion['mask']
             output_dict['sparse_deformed'] = dense_motion['sparse_deformed']
 
@@ -79,7 +86,7 @@ class OcclusionAwareGenerator(nn.Module):
             else:
                 occlusion_map = None
 
-            deformation = dense_motion['deformation']
+            deformation = dense_motion['deformation']  # (N, h, w, 2)
             out = self.deform_input(out, deformation)
 
             if occlusion_map is not None:
@@ -87,12 +94,13 @@ class OcclusionAwareGenerator(nn.Module):
                     occlusion_map = F.interpolate(occlusion_map, size=out.shape[2:], mode='bilinear')
                 out = out * occlusion_map
 
-            output_dict["deformed"] = self.deform_input(source_image, deformation)
+            output_dict["deformed"] = self.deform_input(source_image, deformation)  # (N, 3, H, W)
 
         # Decodign part
         out = self.bottleneck(out)
         for i in range(len(self.up_blocks)):
             out = self.up_blocks[i](out)
+
         out = self.final(out)
         out = F.sigmoid(out)
 
