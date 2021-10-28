@@ -334,7 +334,32 @@ class SplitSourceDriving(object):
         return out
 
 
-class AllAugmentationTransform:
+class AllAugmentationTransform2(object):
+    def __init__(self, resize_param=None, rotation_param=None, flip_param=None, crop_param=None, jitter_param=None):
+        self.transforms = []
+
+        if flip_param is not None:
+            self.transforms.append(RandomFlip(**flip_param))
+
+        if rotation_param is not None:
+            self.transforms.append(RandomRotation(**rotation_param))
+
+        if resize_param is not None:
+            self.transforms.append(RandomResize(**resize_param))
+
+        if crop_param is not None:
+            self.transforms.append(RandomCrop(**crop_param))
+
+        if jitter_param is not None:
+            self.transforms.append(ColorJitter(**jitter_param))
+
+    def __call__(self, clip):
+        for t in self.transforms:
+            clip = t(clip)
+        return clip
+
+
+class AllAugmentationTransform(object):
     def __init__(self, resize_param=None, rotation_param=None, flip_param=None, crop_param=None, jitter_param=None):
         self.transforms = []
         self.select = SelectRandomFrames()

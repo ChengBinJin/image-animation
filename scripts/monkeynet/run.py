@@ -19,7 +19,7 @@ from library.utils.files import get_name
 from library.dataset.frames_dataset import FramesDataset
 from library.pipeline.train import train
 from library.pipeline.reconstruction import reconstruction
-from library.pipeline.animate import animate
+from library.pipeline.animate2 import animate
 # from library.pipeline.prediction import prediction
 
 

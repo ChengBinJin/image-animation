@@ -36,6 +36,10 @@ def find_best_frame(source, driving, cpu=False):
     return frame_num
 
 
+def detach_kp(kp):
+    return {key: value.detach() for key, value in kp.items()}
+
+
 def cat_dict(data, dim):
     return {k: torch.cat([v[k] for v in data], dim=dim) for k in data[0]}
 

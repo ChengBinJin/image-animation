@@ -2,11 +2,12 @@ import os
 import imageio
 import torch
 import numpy as np
+import torch.nn.functional as F
 from tqdm import tqdm
 from torch.utils.data import DataLoader
 
 from library.third_partys.sync_batchnorm import DataParallelWithCallback
-from library.utils.logger.logger import Logger, Visualizer
+from library.utils.logger.logger import Logger, Logger2, Visualizer, Visualizer2
 from library.utils.loss import reconstruction_loss
 from library.utils.files import get_name
 
@@ -31,6 +32,69 @@ def generate(generator, source, kp_source, kp_drivings):
     out['kp_driving'] = kp_drivings
     out['kp_source'] = kp_source
     return out
+
+
+def reconstruction2(config, kp_detector, generator, checkpoint, log_dir, dataset):
+    log_dir = os.path.join(log_dir, 'reconstruction')
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+
+    if checkpoint is not None:
+        Logger2.load_cpk(checkpoint, kp_detector=kp_detector, generator=generator)
+    else:
+        raise AttributeError("Checkpoint should be specified for mode='reconstruction'.")
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False, num_workers=1)
+
+    loss_list = []
+    if torch.cuda.is_available():
+        kp_detector = DataParallelWithCallback(kp_detector)
+        generator = DataParallelWithCallback(generator)
+
+    kp_detector.eval()
+    generator.eval()
+
+    size = config['dataset_params']['frame_shape']
+    for it, x in tqdm(enumerate(dataloader)):
+        print(f"video name: {x['name'][0]}")
+        eval_size = x['video'][:, :, 0].shape[-2:]
+
+        with torch.no_grad():
+            if torch.cuda.is_available():
+                x['video'] = x['video'].cuda()
+
+            source_ori = x['video'][:, :, 0]
+            source = F.interpolate(source_ori, size=size[0:2])
+            kp_source = kp_detector(source)
+            for frame_idx in range(x['video'].shape[2]):
+                input_driving = F.interpolate(x['video'][:, :, frame_idx], size=size[0:2])
+                eval_driving = x['video'][:, :, frame_idx]
+                kp_driving = kp_detector(input_driving)
+
+                out = generator(source, kp_source=kp_source, kp_driving=kp_driving)
+                out['kp_source'] = kp_source
+                out['kp_driving'] = kp_driving
+                del out['sparse_deformed']
+
+                if size != eval_size:
+                    eval_out = F.interpolate(out['prediction'], size=eval_size[:2])
+                else:
+                    eval_out = out['prediction']
+
+                # predictions.append(np.transpose(out['prediction'].data.cpu().numpy(), [0, 2, 3, 1])[0])
+                # visualization = Visualizer2(**config['visualizer_params']).visualize(
+                #     source=source, driving=driving, out=out)
+                # visualizations.append(visualization)
+
+                loss_list.append(torch.abs(eval_out - eval_driving).mean().cpu().numpy())
+                # lpips_list.append(cal_lpips(lpips_net, eval_driving, eval_out))
+
+            # predictions = np.concatenate(predictions, axis=1)
+
+            # image_name = x['name'][0] + config['reconstruction_params']['format']
+            # imageio.mimsave(os.path.join(log_dir, image_name), visualizations)
+
+    print(f"Reconstruction loss: {np.mean(loss_list):.3f}")
+    # print(f"LPIPS: {np.mean(lpips_list):.3f}")
 
 
 def reconstruction(config, kp_detector, generator, checkpoint, log_dir, dataset):

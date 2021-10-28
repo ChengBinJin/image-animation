@@ -16,7 +16,7 @@ from library.utils.logger.logger import Logger
 from library.utils.process import transfer_one
 from library.dataset.frames_dataset import read_video
 from library.dataset.augmentation import VideoToTensor
-from library.sync_batchnorm import DataParallelWithCallback
+from library.third_partys.sync_batchnorm import DataParallelWithCallback
 from library.utils.files import get_name
 
 

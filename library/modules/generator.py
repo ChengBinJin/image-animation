@@ -4,7 +4,7 @@ from torch import nn
 
 from library.modules.dense_motion import MovementEmbeddingModule, DenseMotionModule, IdentityDeformation, \
     DenseMotionNetwork
-from library.modules.block import Encoder, Decoder, ResBlock3d, SameBlock2d, DownBlock2d, UpBlock2d, ResBlock2d
+from library.modules.block import Encoder, Decoder, ResBlock3d, SameBlock2d, UpBlock2d, ResBlock2d, DownBlock2dGen
 
 
 class OcclusionAwareGenerator(nn.Module):
@@ -30,7 +30,7 @@ class OcclusionAwareGenerator(nn.Module):
         for i in range(num_down_blocks):
             in_features = min(max_features, block_expansion * (2 ** i))
             out_features = min(max_features, block_expansion * (2 ** (i + 1)))
-            down_blocks.append(DownBlock2d(in_features, out_features, kernel_size=(3, 3), padding=(1, 1)))
+            down_blocks.append(DownBlock2dGen(in_features, out_features, kernel_size=(3, 3), padding=(1, 1)))
         self.down_blocks = nn.ModuleList(down_blocks)
 
         up_blocks = []
@@ -56,9 +56,9 @@ class OcclusionAwareGenerator(nn.Module):
 
         if h_old != h or w_old != w:
             deformation = deformation.permute(0, 3, 1, 2)
-            deformation = F.interpolate(deformation, size=(h, w), mode='bilinear')
+            deformation = F.interpolate(deformation, size=(h, w), mode='bilinear', align_corners=True)
             deformation = deformation.permute(0, 2, 3, 1)
-        return F.grid_sample(inp, deformation)
+        return F.grid_sample(inp, deformation, align_corners=True)
 
     def forward(self, source_image, kp_driving, kp_source):
         # Encoding (downsampling) part
@@ -91,7 +91,8 @@ class OcclusionAwareGenerator(nn.Module):
 
             if occlusion_map is not None:
                 if out.shape[2] != occlusion_map.shape[2] or out.shape[3] != occlusion_map.shape[3]:
-                    occlusion_map = F.interpolate(occlusion_map, size=out.shape[2:], mode='bilinear')
+                    occlusion_map = F.interpolate(
+                        occlusion_map, size=out.shape[2:], mode='bilinear', align_corners=True)
                 out = out * occlusion_map
 
             output_dict["deformed"] = self.deform_input(source_image, deformation)  # (N, 3, H, W)
@@ -102,7 +103,7 @@ class OcclusionAwareGenerator(nn.Module):
             out = self.up_blocks[i](out)
 
         out = self.final(out)
-        out = F.sigmoid(out)
+        out = torch.sigmoid(out)
 
         output_dict["prediction"] = out
 
@@ -158,7 +159,7 @@ class MotionTransferGenerator(nn.Module):
         _, _, _, h, w = inp.shape
         deformations_absolute = deformations_absolute.permute(0, 4, 1, 2, 3)  # (N, 3, 1, H, W)
         deformation = F.interpolate(
-            deformations_absolute, size=(d, h, w), mode=self.interpolation_mode, recompute_scale_factor=False)
+            deformations_absolute, size=(d, h, w), mode=self.interpolation_mode, align_corners=True)
         deformation = deformation.permute(0, 2, 3, 4, 1)  # (N, 1, H, W, 3)
         deformed_inp = F.grid_sample(inp, deformation, align_corners=True)  # (N, C, 1, H, W)
         return deformed_inp
@@ -182,8 +183,8 @@ class MotionTransferGenerator(nn.Module):
             movement_embedding = self.kp_embedding_module(
                 source_image=source_image, kp_driving=kp_driving, kp_source=kp_source)  # (1, num_kp, 1, H, W)
             kp_skips = [F.interpolate(
-                movement_embedding, size=(d,) + skip.shape[3:], mode=self.interpolation_mode,
-                recompute_scale_factor=False) for skip in appearance_skips]
+                movement_embedding, size=(d,) + skip.shape[3:], mode=self.interpolation_mode, align_corners=True)
+                for skip in appearance_skips]
             skips = [torch.cat([a, b], dim=1) for a, b in zip(deformed_skips, kp_skips)]
         else:
             skips = deformed_skips

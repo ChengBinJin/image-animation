@@ -16,9 +16,9 @@ class Encoder2(nn.Module):
 
         down_blocks = []
         for i in range(num_blocks):
-            down_blocks.append(DownBlock2d(in_features if i == 0 else min(max_features, block_expansion * (2 ** i)),
-                                           min(max_features, block_expansion * (2 ** (i + 1))), kernel_size=3,
-                                           padding=1))
+            down_blocks.append(DownBlock2dGen(in_features if i == 0 else min(max_features, block_expansion * (2 ** i)),
+                                              min(max_features, block_expansion * (2 ** (i + 1))), kernel_size=3,
+                                              padding=1))
         self.down_blocks = nn.ModuleList(down_blocks)
 
     def forward(self, x):
@@ -152,13 +152,13 @@ class Hourglass(nn.Module):
         return out
 
 
-class DownBlock2d(nn.Module):
+class DownBlock2dGen(nn.Module):
     """
     Downsampling block for use in encoder.
     """
 
     def __init__(self, in_features, out_features, kernel_size=3, padding=1, groups=1):
-        super(DownBlock2d, self).__init__()
+        super(DownBlock2dGen, self).__init__()
 
         self.conv = nn.Conv2d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size,
                               padding=padding, groups=groups)
@@ -171,6 +171,37 @@ class DownBlock2d(nn.Module):
         out = self.norm(out)
         out = self.activate(out)
         out = self.pool(out)
+        return out
+
+
+class DownBlock2dDis(nn.Module):
+    """
+    Simple block for processing video (encoder).
+    """
+
+    def __init__(self, in_features, out_features, norm=False, kernel_size=4, pool=False, sn=False):
+        super(DownBlock2dDis, self).__init__()
+
+        self.conv = nn.Conv2d(in_channels=in_features, out_channels=out_features, kernel_size=kernel_size)
+
+        if sn:
+            self.conv = nn.utils.spectral_norm(self.conv)
+        if norm:
+            self.norm = nn.InstanceNorm2d(out_features, affine=True)
+        else:
+            self.norm = None
+        if pool:
+            self.pool = nn.AvgPool2d(kernel_size=(2, 2))
+        self.activate = nn.LeakyReLU(negative_slope=0.2)
+
+    def forward(self, x):
+        out = x
+        out = self.conv(out)
+        if self.norm:
+            out = self.norm(out)
+        out = self.activate(out)
+        if self.pool:
+            out = self.pool(out)
         return out
 
 
