@@ -11,9 +11,15 @@ class Vgg19(torch.nn.Module):
     """
     Vgg19 network for perceptual loss. See Sec 3.3.
     """
-    def __init__(self, requires_grad=False):
+    def __init__(self, model_path=None, requires_grad=False):
         super(Vgg19, self).__init__()
-        vgg_pretrained_features = models.vgg19(pretrained=True).features
+
+        if model_path is None:
+            vgg_pretrained_features = models.vgg19(pretrained=True).features
+        else:
+            vgg_model = models.vgg19(pretrained=False)  # init model:
+            vgg_model.load_state_dict(torch.load(model_path))
+            vgg_pretrained_features = vgg_model.features
 
         self.slice1 = torch.nn.Sequential()
         self.slice2 = torch.nn.Sequential()
@@ -22,7 +28,7 @@ class Vgg19(torch.nn.Module):
         self.slice5 = torch.nn.Sequential()
 
         for x in range(2):
-            self.slice1.add_moudle(str(x), vgg_pretrained_features[x])
+            self.slice1.add_module(str(x), vgg_pretrained_features[x])
         for x in range(2, 7):
             self.slice2.add_module(str(x), vgg_pretrained_features[x])
         for x in range(7, 12):

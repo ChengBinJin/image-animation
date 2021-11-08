@@ -17,7 +17,7 @@ class GeneratorFullModel2(torch.nn.Module):
         self.discriminator = discriminator
         self.train_params = train_params
         self.scales = train_params['scales']
-        self.disc_scales = self.discrimiator.scales
+        self.disc_scales = self.discriminator.scales
         self.pyramid = ImagePyramide(self.scales, generator.num_channels)
         if torch.cuda.is_available():
             self.pyramid = self.pyramid.cuda()
@@ -25,7 +25,7 @@ class GeneratorFullModel2(torch.nn.Module):
         self.loss_weights = train_params['loss_weights']
 
         if sum(self.loss_weights['perceptual']) != 0:
-            self.vgg = Vgg19()
+            self.vgg = Vgg19(model_path=train_params['vgg19_path'])
             if torch.cuda.is_available():
                 self.vgg = self.vgg.cuda()
 

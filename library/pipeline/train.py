@@ -35,7 +35,7 @@ def train2(config, kp_detector, generator, discriminator, checkpoint, log_dir, d
                                         last_epoch=-1 + start_epoch * (train_params['lr_kp_detector'] != 0))
     scheduler_generator = MultiStepLR(optimizer_generator, train_params['epoch_milestones'], gamma=0.1,
                                       last_epoch=start_epoch - 1)
-    scheduler_discrimiantor = MultiStepLR(optimizer_discriminator, train_params['epoch_milestone'], gamma=0.1,
+    scheduler_discrimiantor = MultiStepLR(optimizer_discriminator, train_params['epoch_milestones'], gamma=0.1,
                                           last_epoch=start_epoch - 1)
 
     if 'num_repeats' in train_params or train_params['num_repeats'] != 1:

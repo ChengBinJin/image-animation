@@ -192,6 +192,8 @@ class DownBlock2dDis(nn.Module):
             self.norm = None
         if pool:
             self.pool = nn.AvgPool2d(kernel_size=(2, 2))
+        else:
+            self.pool = pool
         self.activate = nn.LeakyReLU(negative_slope=0.2)
 
     def forward(self, x):
