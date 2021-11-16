@@ -85,7 +85,7 @@ class GeneratorFullModel2(torch.nn.Module):
                 # Value loss part
                 if self.loss_weights['equivariance_value'] != 0:
                     value = torch.abs(kp_driving['value'] - transform.warp_coordinates(transformed_kp['value'])).mean()
-                    loss_values['equivariance_value'] = self.loss_weigths['equivariance_value'] * value
+                    loss_values['equivariance_value'] = self.loss_weights['equivariance_value'] * value
 
                 # jacobian loss part
                 if self.loss_weights['equivariance_jacobian'] != 0:

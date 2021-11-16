@@ -31,6 +31,7 @@ if __name__ == "__main__":
     parser.add_argument("--checkpoint", default=None, help="path to checkpoint to restore")
     parser.add_argument("--device_ids", default="0", type=lambda x: list(map(int, x.split(','))),
                         help="Names of devices comma separated.")
+    parser.add_argument("--verbose", dest="verbose", action="store_true", help="Print model architecture")
     opt = parser.parse_args()
 
     with open(opt.config) as f:
@@ -59,9 +60,10 @@ if __name__ == "__main__":
         generator.to(opt.device_ids[0])
         discriminator.to(opt.device_ids[0])
 
-    print(kp_detector, "\n")
-    print(generator, "\n")
-    print(discriminator, "\n")
+    if opt.verbose:
+        print(kp_detector, "\n")
+        print(generator, "\n")
+        print(discriminator, "\n")
 
     dataset = FramesDataset2(is_train=(opt.mode == 'train'), **config['dataset_params'])
 
